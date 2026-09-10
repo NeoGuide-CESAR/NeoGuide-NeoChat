@@ -1,0 +1,96 @@
+# ==============================================================================
+# Lumi NeoGuide - Graphify Ignore Rules
+# Validação baseada na documentação técnica (docs/01 a docs/07)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Documentação Bruta & Binários Redundantes
+# ------------------------------------------------------------------------------
+# As normas técnicas da Neoenergia (DIS-NOR-030 e DIS-NOR-053) já possuem
+# transcrições estruturadas em Markdown (docs/info/*.md) que contêm o texto,
+# tabelas e seções técnicas indexáveis. Ignoramos os PDFs brutos para evitar
+# arestas e nós duplicados no grafo de conhecimento.
+docs/info/*.pdf
+*.docx
+*.xlsx
+*.csv
+
+# ------------------------------------------------------------------------------
+# 2. Especificações e Histórico OpenSpec
+# ------------------------------------------------------------------------------
+# Mantém apenas as especificações consolidadas (openspec/specs/) e tarefas
+# ativas (openspec/changes/), excluindo o histórico arquivado para evitar ruído.
+openspec/changes/archive/
+
+# ------------------------------------------------------------------------------
+# 3. Metadados do Agente & Gestão de Backlog
+# ------------------------------------------------------------------------------
+# Lumi é um microsserviço de backend com domínio em engenharia elétrica e RAG.
+# Ignoramos meta-prompts do assistente e planejamento ágil de sprints locais
+# para manter o grafo focado 100% no sistema (arquitetura, regras e código).
+.agent/
+planner/
+
+# ------------------------------------------------------------------------------
+# 4. Credenciais, Variáveis de Ambiente & Segredos
+# ------------------------------------------------------------------------------
+# Conforme docs/05 e docs/06, credenciais de LLMs (Gemini, Claude) e banco residem
+# exclusivamente em .env via Pydantic Settings. Impedir indexação de segredos.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ------------------------------------------------------------------------------
+# 5. Mídias e Assets Estáticos
+# ------------------------------------------------------------------------------
+# O Lumi adota arquitetura Headless (sem frontend no repo). Ignoramos imagens
+# e mídias estáticas de documentação que possam gerar nós vazios no grafo.
+*.svg
+*.ico
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+
+# ------------------------------------------------------------------------------
+# 6. Testes, Cobertura, Linter & Evals de RAG (docs/06 e docs/07)
+# ------------------------------------------------------------------------------
+# Ignora relatórios e caches de suítes de teste (pytest, ruff, mypy, ragas).
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+test-results/
+ragas-report/
+eval_results/
+
+# ------------------------------------------------------------------------------
+# 7. Python Runtime, Builds & Gerenciador uv (docs/05 ADR-02)
+# ------------------------------------------------------------------------------
+# O projeto padroniza o gerenciamento com uv e runtime Python 3.12+.
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+dist/
+build/
+*.egg-info/
+
+# ------------------------------------------------------------------------------
+# 8. Persistência Local & Volumes de Banco (PostgreSQL + pgvector)
+# ------------------------------------------------------------------------------
+# O banco é provisionado via Docker Compose (lumi-db). Ignora dados brutos locais.
+pgdata/
+.pgdata/
+postgres_data/
+*.sqlite3
+*.db
+data/

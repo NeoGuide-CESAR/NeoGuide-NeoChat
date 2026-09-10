@@ -1,0 +1,183 @@
+# =============================================================================
+# .gitignore — Lumi (NeoGuide)
+# Stack: Python 3.12+ · uv · FastAPI · LangChain · PostgreSQL + pgvector
+#        Alembic · Docker · pre-commit · Ruff · Mypy · structlog
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Variáveis de Ambiente & Segredos
+# NUNCA commitar chaves de API (Gemini, Anthropic, etc.) nem credenciais de DB
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# -----------------------------------------------------------------------------
+# Python — bytecode, cache e distribuição
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+dist/
+build/
+*.egg-info/
+*.egg
+MANIFEST
+*.whl
+pip-wheel-metadata/
+share/python-wheels/
+
+*.cover
+*.py,cover
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+nosetests.xml
+.pytest_cache/
+.tox/
+.nox/
+*.pyi
+
+# -----------------------------------------------------------------------------
+# uv — gerenciador de pacotes
+# uv.lock É commitado (lock determinístico); apenas o ambiente virtual é ignorado
+# -----------------------------------------------------------------------------
+.venv/
+venv/
+env/
+.python-version
+
+# -----------------------------------------------------------------------------
+# FastAPI / Uvicorn — logs de runtime
+# -----------------------------------------------------------------------------
+access.log
+error.log
+uvicorn.log
+
+# -----------------------------------------------------------------------------
+# structlog — logs estruturados em JSON
+# -----------------------------------------------------------------------------
+logs/
+*.log
+*.log.*
+*.jsonl.log
+
+# -----------------------------------------------------------------------------
+# LangChain — cache de embeddings e checkpoints locais
+# -----------------------------------------------------------------------------
+.langchain/
+langchain_cache/
+langchain.db
+
+# -----------------------------------------------------------------------------
+# PostgreSQL / pgvector — dumps e backups locais
+# -----------------------------------------------------------------------------
+*.sql.gz
+*.dump
+*.pgdump
+*.backup
+pg_data/
+pgdata/
+
+# -----------------------------------------------------------------------------
+# Docker — volumes temporários locais
+# -----------------------------------------------------------------------------
+docker/volumes/
+.docker/
+docker-compose.override.yml
+
+# -----------------------------------------------------------------------------
+# pre-commit — cache de hooks
+# -----------------------------------------------------------------------------
+.pre-commit-cache/
+.pre-commit-pycache/
+
+# -----------------------------------------------------------------------------
+# Ruff — linter & formatter
+# -----------------------------------------------------------------------------
+.ruff_cache/
+
+# -----------------------------------------------------------------------------
+# Mypy — cache de tipagem estática
+# -----------------------------------------------------------------------------
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# -----------------------------------------------------------------------------
+# Pytest — cache e saídas de evals RAG
+# -----------------------------------------------------------------------------
+.pytest_cache/
+tests/evals/results/
+tests/evals/output/
+
+# -----------------------------------------------------------------------------
+# Jupyter / IPython
+# -----------------------------------------------------------------------------
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# -----------------------------------------------------------------------------
+# Graphify — grafo de conhecimento gerado por análise (não vai ao repositório)
+# -----------------------------------------------------------------------------
+graphify-out/
+
+# -----------------------------------------------------------------------------
+# IDEs & Editores
+# -----------------------------------------------------------------------------
+.vscode/
+*.code-workspace
+.idea/
+*.iml
+*.iws
+*.ipr
+*.swp
+*.swo
+*~
+Session.vim
+.vim/
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# -----------------------------------------------------------------------------
+# Sistema Operacional
+# -----------------------------------------------------------------------------
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# -----------------------------------------------------------------------------
+# Miscelânea
+# -----------------------------------------------------------------------------
+*.tmp
+*.temp
+*.bak
+*.orig
+*.prof
+*.pstats
