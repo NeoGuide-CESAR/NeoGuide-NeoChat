@@ -1,0 +1,57 @@
+# =============================================================================
+# Lumi (NeoGuide) — Orquestração Local de Desenvolvimento com Docker Compose
+# Serviços: lumi-api (FastAPI + uv) e lumi-db (PostgreSQL 16 + pgvector)
+# =============================================================================
+
+services:
+  lumi-db:
+    image: pgvector/pgvector:pg16
+    container_name: lumi-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: lumi_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - lumi_pgdata:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lumi_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - lumi-network
+
+  lumi-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: lumi-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@lumi-db:5432/lumi_db
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      ENVIRONMENT: development
+      DEBUG: "true"
+    volumes:
+      - ./src:/app/src:ro
+    depends_on:
+      lumi-db:
+        condition: service_healthy
+    networks:
+      - lumi-network
+
+volumes:
+  lumi_pgdata:
+    driver: local
+
+networks:
+  lumi-network:
+    driver: bridge
