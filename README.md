@@ -37,3 +37,12 @@ uv run uvicorn src.lumi.main:app --reload --port 8000
 ```bash
 uv run pytest
 ```
+
+### 5. Qualidade de Código e Pre-commit Hooks
+```bash
+# Instalar os hooks no repositório git local
+uv run pre-commit install
+
+# Executar manualmente a validação em todos os arquivos
+uv run pre-commit run --all-files
+```
