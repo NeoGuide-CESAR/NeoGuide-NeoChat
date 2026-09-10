@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     db_pool_timeout: int = Field(default=30, description="Timeout de aquisição de conexão")
 
     # Provedores de IA
+    default_llm_provider: str = Field(
+        default="gemini", description="Provedor padrão de LLM (gemini ou claude/anthropic)"
+    )
+    default_embedding_provider: str = Field(
+        default="gemini", description="Provedor padrão de embeddings (gemini ou fake)"
+    )
     gemini_api_key: str = Field(default="", description="Chave de API do Google Gemini")
     gemini_model: str = Field(default="gemini-1.5-pro", description="Modelo LLM padrão")
     gemini_embedding_model: str = Field(
