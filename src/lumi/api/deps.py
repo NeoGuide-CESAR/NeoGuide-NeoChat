@@ -10,6 +10,7 @@ from fastapi import HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
 
 from lumi.core.config import get_settings
+from lumi.db.session import get_db, get_db_session
 
 # Header de autenticação padrão da API Lumi
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -108,3 +109,13 @@ async def api_key_and_rate_limit(
     identifier = api_key or (request.client.host if request.client else "anonymous")
     await default_rate_limiter.check_rate_limit(identifier)
     return api_key
+
+
+__all__ = [
+    "verify_api_key",
+    "RateLimiter",
+    "default_rate_limiter",
+    "api_key_and_rate_limit",
+    "get_db",
+    "get_db_session",
+]

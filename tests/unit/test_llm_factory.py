@@ -144,5 +144,7 @@ def test_validate_embedding_dimension(mock_settings: Settings) -> None:
     assert validate_embedding_dimension(valid_vector, settings=mock_settings) is True
 
     # Dimensão incorreta deve lançar ValueError
-    with pytest.raises(ValueError, match="Dimensão de embedding inválida: esperada 768, obtida 512"):
+    with pytest.raises(
+        ValueError, match="Dimensão de embedding inválida: esperada 768, obtida 512"
+    ):
         validate_embedding_dimension(invalid_vector, expected_dimension=768)

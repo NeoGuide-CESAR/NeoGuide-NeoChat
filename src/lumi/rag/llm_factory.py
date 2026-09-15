@@ -35,9 +35,7 @@ def get_llm(
         ValueError: Caso o provedor não seja suportado ou falte a chave de API obrigatória.
     """
     resolved_settings = settings or get_settings()
-    selected_provider = (
-        (provider or resolved_settings.default_llm_provider).strip().lower()
-    )
+    selected_provider = (provider or resolved_settings.default_llm_provider).strip().lower()
 
     if selected_provider == "gemini":
         api_key = resolved_settings.gemini_api_key
@@ -91,9 +89,7 @@ def get_embeddings(
         ValueError: Caso o provedor não seja suportado ou falte a chave de API obrigatória.
     """
     resolved_settings = settings or get_settings()
-    selected_provider = (
-        (provider or resolved_settings.default_embedding_provider).strip().lower()
-    )
+    selected_provider = (provider or resolved_settings.default_embedding_provider).strip().lower()
 
     if selected_provider == "gemini":
         api_key = resolved_settings.gemini_api_key
@@ -141,9 +137,7 @@ def validate_embedding_dimension(
     actual = len(embedding)
 
     if actual != expected:
-        raise ValueError(
-            f"Dimensão de embedding inválida: esperada {expected}, obtida {actual}."
-        )
+        raise ValueError(f"Dimensão de embedding inválida: esperada {expected}, obtida {actual}.")
 
     return True
 
