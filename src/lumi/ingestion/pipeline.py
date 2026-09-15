@@ -255,6 +255,11 @@ def _build_argument_parser() -> argparse.ArgumentParser:
 
 async def main(args: list[str] | None = None) -> int:
     """Ponto de entrada assíncrono para execução via CLI."""
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     parser = _build_argument_parser()
     cli_args = parser.parse_args(args)
 
@@ -281,12 +286,14 @@ async def main(args: list[str] | None = None) -> int:
         )
         return 1
 
-    print(f"\n🚀 Iniciando ingestão normativa de {len(files_to_process)} arquivo(s)...")
-    print(f"📦 Provedor: {cli_args.provider or 'padrão'} | Batch size: {cli_args.batch_size}\n")
+    print(f"\n[INICIANDO] Ingestão normativa de {len(files_to_process)} arquivo(s)...")
+    print(
+        f"[CONFIG] Provedor: {cli_args.provider or 'padrão'} | Batch size: {cli_args.batch_size}\n"
+    )
 
     has_errors = False
     for file in files_to_process:
-        print(f"📄 Processando: {file.name} ...", end=" ", flush=True)
+        print(f"[PROCESSANDO] {file.name} ...", end=" ", flush=True)
         res = await ingest_normative_file(
             file_path=file,
             provider=cli_args.provider,
@@ -295,14 +302,14 @@ async def main(args: list[str] | None = None) -> int:
 
         if res.status == "success":
             print(
-                f"✅ Concluído! Norma: {res.document_code} (Rev: {res.revision}) - "
+                f"[OK] Concluído! Norma: {res.document_code} (Rev: {res.revision}) - "
                 f"{res.total_chunks} chunks indexados em {res.duration_seconds}s"
             )
         else:
-            print(f"❌ Falha: {res.error_message}")
+            print(f"[ERRO] Falha: {res.error_message}")
             has_errors = True
 
-    print("\n🏁 Finalizado!")
+    print("\n[CONCLUÍDO] Pipeline finalizado!")
     return 1 if has_errors else 0
 
 
