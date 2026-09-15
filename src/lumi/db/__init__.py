@@ -19,11 +19,13 @@ from lumi.db.session import (
     get_session_factory,
     sanitize_db_error,
 )
+from lumi.db.vector_store import NormativeVectorStore
 
 __all__ = [
     "Base",
     "NormativeDocument",
     "NormativeChunk",
+    "NormativeVectorStore",
     "ChatSession",
     "ChatMessage",
     "NormativeQueryAnalytics",

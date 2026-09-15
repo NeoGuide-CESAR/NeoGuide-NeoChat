@@ -106,7 +106,17 @@ def get_embeddings(
 
     if selected_provider == "fake":
         size = kwargs.pop("size", resolved_settings.embedding_dimension)
-        return FakeEmbeddings(size=size, **kwargs)
+        try:
+            import numpy as _np  # noqa: F401
+
+            return FakeEmbeddings(size=size, **kwargs)
+        except ImportError:
+
+            class _SafeFakeEmbeddings(FakeEmbeddings):
+                def _get_embedding(self) -> list[float]:
+                    return [0.1] * self.size
+
+            return _SafeFakeEmbeddings(size=size, **kwargs)
 
     raise ValueError(
         f"Provedor de embeddings '{selected_provider}' não suportado. "

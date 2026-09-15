@@ -15,6 +15,11 @@ from lumi.ingestion.parser import (
     parse_markdown_file,
     parse_pdf_file,
 )
+from lumi.ingestion.pipeline import (
+    IngestionResult,
+    generate_embeddings_with_retry,
+    ingest_normative_file,
+)
 from lumi.ingestion.sanitizer import (
     fix_reversed_table_headers,
     inject_page_markers,
@@ -24,6 +29,7 @@ from lumi.ingestion.sanitizer import (
 
 __all__ = [
     "DocumentPage",
+    "IngestionResult",
     "NormativeChunkData",
     "ParsedDocument",
     "chunk_document",
@@ -32,6 +38,8 @@ __all__ = [
     "fix_reversed_table_headers",
     "format_breadcrumb",
     "format_table_as_markdown",
+    "generate_embeddings_with_retry",
+    "ingest_normative_file",
     "inject_page_markers",
     "normalize_unicode_and_spaces",
     "parse_document",
