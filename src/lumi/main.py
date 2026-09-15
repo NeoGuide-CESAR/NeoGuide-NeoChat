@@ -5,10 +5,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from lumi import __version__
 from lumi.api.deps import api_key_and_rate_limit
+from lumi.api.middleware import CorrelationIdMiddleware
 from lumi.api.v1.router import api_v1_router
 from lumi.core.config import get_settings
+from lumi.core.logging import setup_logging
 
 settings = get_settings()
+
+# Inicialização do logging estruturado centralizado
+setup_logging()
 
 app = FastAPI(
     title="Lumi (NeoGuide) API",
@@ -18,7 +23,8 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Configuração de CORS
+# Registro de Middlewares HTTP (execução: CorrelationIdMiddleware envolve CORSMiddleware)
+app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
