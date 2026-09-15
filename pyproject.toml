@@ -25,6 +25,7 @@ dependencies = [
     "langchain-google-genai>=1.0.8",
     "langchain-anthropic>=0.1.23",
     "structlog>=24.4.0",
+    "pdfplumber>=0.11.0",
 ]
 
 [project.optional-dependencies]
