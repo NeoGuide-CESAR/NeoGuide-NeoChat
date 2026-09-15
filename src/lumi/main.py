@@ -1,9 +1,10 @@
 """Ponto de entrada da aplicação FastAPI do Lumi NeoGuide."""
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from lumi import __version__
+from lumi.api.deps import api_key_and_rate_limit
 from lumi.core.config import get_settings
 
 settings = get_settings()
@@ -43,4 +44,15 @@ async def health() -> dict[str, str]:
     return {
         "status": "healthy",
         "version": __version__,
+    }
+
+
+@app.get("/api/v1/auth/check", tags=["Autenticação"])
+async def auth_check(
+    _api_key: str = Depends(api_key_and_rate_limit),
+) -> dict[str, str]:
+    """Endpoint de verificação de integridade da autenticação e limites de requisição."""
+    return {
+        "status": "authenticated",
+        "message": "API Key is valid",
     }
