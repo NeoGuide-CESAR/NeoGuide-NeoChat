@@ -12,8 +12,12 @@ from lumi.db.session import (
     async_session_factory,
     create_app_engine,
     engine,
+    get_async_session,
     get_db,
     get_db_session,
+    get_engine,
+    get_session_factory,
+    sanitize_db_error,
 )
 
 __all__ = [
@@ -26,6 +30,10 @@ __all__ = [
     "engine",
     "create_app_engine",
     "async_session_factory",
+    "get_engine",
+    "get_session_factory",
     "get_db_session",
     "get_db",
+    "get_async_session",
+    "sanitize_db_error",
 ]

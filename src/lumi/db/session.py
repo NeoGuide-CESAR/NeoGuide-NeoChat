@@ -1,5 +1,6 @@
 """Configuração da engine assíncrona SQLAlchemy e gerenciamento de sessões."""
 
+import re
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -42,6 +43,16 @@ async_session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
 )
 
 
+def get_engine() -> AsyncEngine:
+    """Retorna o engine assíncrono singleton do SQLAlchemy."""
+    return engine
+
+
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """Retorna a fábrica singleton de sessões assíncronas."""
+    return async_session_factory
+
+
 @asynccontextmanager
 async def get_db_session(
     session_factory: async_sessionmaker[AsyncSession] | None = None,
@@ -68,3 +79,20 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Gerador assíncrono para injeção de dependência no FastAPI via Depends(get_db)."""
     async with get_db_session() as session:
         yield session
+
+
+# Alias injetável para injeção de AsyncSession em rotas
+get_async_session = get_db
+
+
+def sanitize_db_error(error: Exception | str) -> str:
+    """Sanitiza mensagens de erro de banco de dados removendo credenciais e senhas."""
+    message = str(error)
+    # Remove senhas em URIs de conexão como postgresql+asyncpg://user:password@host:port/db
+    sanitized = re.sub(r"://([^:]+):([^@]+)@", r"://\1:***@", message)
+    # Remove menções diretas de senhas
+    sanitized = re.sub(
+        r"password=['\"][^'\"]+['\"]", "password='***'", sanitized, flags=re.IGNORECASE
+    )
+    sanitized = re.sub(r"password\s*=\s*[^\s]+", "password=***", sanitized, flags=re.IGNORECASE)
+    return sanitized

@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from lumi import __version__
 from lumi.api.deps import api_key_and_rate_limit
+from lumi.api.v1.router import api_v1_router
 from lumi.core.config import get_settings
 
 settings = get_settings()
@@ -25,6 +26,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Registro de Roteadores da API
+app.include_router(api_v1_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Diagnóstico"])

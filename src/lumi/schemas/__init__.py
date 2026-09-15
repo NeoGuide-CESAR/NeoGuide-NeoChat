@@ -9,6 +9,10 @@ from lumi.schemas.chat import (
     StreamSourcesEvent,
     StreamTokenEvent,
 )
+from lumi.schemas.health import (
+    DatabaseHealthInfo,
+    HealthCheckResponse,
+)
 from lumi.schemas.session import (
     ChatMessageResponse,
     SessionCreateResponse,
@@ -19,6 +23,8 @@ __all__ = [
     "ChatMessageResponse",
     "ChatRequest",
     "ChatResponse",
+    "DatabaseHealthInfo",
+    "HealthCheckResponse",
     "SessionCreateResponse",
     "SessionDetailResponse",
     "SourceMetadata",
