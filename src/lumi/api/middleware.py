@@ -14,9 +14,7 @@ logger = structlog.get_logger(__name__)
 class CorrelationIdMiddleware(BaseHTTPMiddleware):
     """Middleware para correlação de requisições assíncronas via X-Request-ID."""
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Processa a requisição, vincula o ID de correlação e audita a latência."""
         request_id = request.headers.get("X-Request-ID")
         if not request_id:
