@@ -20,6 +20,9 @@ def test_settings_defaults() -> None:
     assert "postgresql+asyncpg" in settings.database_url
     assert settings.similarity_threshold == 0.70
     assert settings.top_k_retrieval == 10
+    assert settings.reranker_enabled is True
+    assert settings.reranker_top_n == 5
+    assert settings.query_rewriter_enabled is True
 
 
 @pytest.mark.asyncio
