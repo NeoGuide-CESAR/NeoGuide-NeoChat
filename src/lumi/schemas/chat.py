@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 
 class SourceMetadata(BaseModel):
@@ -129,15 +129,17 @@ class StreamDoneEvent(BaseModel):
 class StreamErrorEvent(BaseModel):
     """Evento SSE emitido em situações de erro durante o streaming da resposta."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     error: str = Field(
         ...,
         min_length=1,
+        validation_alias=AliasChoices("error", "message"),
         description="Mensagem descritiva e amigável do erro",
     )
     code: str = Field(
         ...,
         min_length=1,
+        validation_alias=AliasChoices("code", "error_code"),
         description="Código identificador do erro (ex.: LLM_STREAM_ERROR)",
     )
