@@ -61,7 +61,10 @@ class Settings(BaseSettings):
     reranker_enabled: bool = Field(default=False, description="Habilitar reranker cross-encoder")
 
     # Sessão e Limites
-    session_ttl_hours: int = Field(default=24, description="TTL em horas para expiração de sessões")
+    session_ttl_hours: int = Field(default=1, description="TTL em horas para expiração de sessões")
+    chat_history_limit: int = Field(
+        default=10, description="Limite padrão de mensagens recentes na janela multi-turn"
+    )
     rate_limit_requests_per_minute: int = Field(
         default=60, description="Limite de requisições por minuto por API Key"
     )
