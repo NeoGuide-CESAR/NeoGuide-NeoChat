@@ -19,6 +19,7 @@ def test_settings_defaults() -> None:
     assert settings.api_port == 8000
     assert "postgresql+asyncpg" in settings.database_url
     assert settings.similarity_threshold == 0.70
+    assert settings.top_k_retrieval == 10
 
 
 @pytest.mark.asyncio

@@ -21,12 +21,20 @@ from lumi.rag.prompts import (
     get_chat_prompt_template,
     get_rag_prompt_template,
 )
+from lumi.rag.retriever import (
+    NormativeRetriever,
+    RetrievalResult,
+    RetrievedChunk,
+)
 
 __all__ = [
     "CONTINGENCY_NO_SOURCES_MESSAGE",
     "CONTINGENCY_NO_SOURCES_PROMPT",
     "GuardrailResult",
     "LUMI_SYSTEM_PROMPT",
+    "NormativeRetriever",
+    "RetrievalResult",
+    "RetrievedChunk",
     "SUPPORTED_EMBEDDING_PROVIDERS",
     "SUPPORTED_LLM_PROVIDERS",
     "check_domain_scope",

@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     similarity_threshold: float = Field(
         default=0.70, description="Threshold mínimo de similaridade de cosseno"
     )
-    top_k_retrieval: int = Field(default=5, description="Número de chunks retornados no retrieval")
+    top_k_retrieval: int = Field(default=10, description="Número de chunks retornados no retrieval")
     reranker_enabled: bool = Field(default=False, description="Habilitar reranker cross-encoder")
 
     # Sessão e Limites

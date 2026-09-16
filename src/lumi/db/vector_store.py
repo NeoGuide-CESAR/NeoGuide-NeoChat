@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from lumi.db.models import NormativeChunk, NormativeDocument
 
@@ -120,7 +121,9 @@ class NormativeVectorStore:
         distance_expr = NormativeChunk.embedding.cosine_distance(query_embedding)
         similarity_expr = (1.0 - distance_expr).label("similarity")
 
-        stmt = select(NormativeChunk, similarity_expr)
+        stmt = select(NormativeChunk, similarity_expr).options(
+            selectinload(NormativeChunk.document)
+        )
 
         if document_code:
             stmt = stmt.join(
