@@ -58,7 +58,15 @@ class Settings(BaseSettings):
         default=0.70, description="Threshold mínimo de similaridade de cosseno"
     )
     top_k_retrieval: int = Field(default=10, description="Número de chunks retornados no retrieval")
-    reranker_enabled: bool = Field(default=False, description="Habilitar reranker cross-encoder")
+    reranker_enabled: bool = Field(
+        default=True, description="Habilitar reranker cross-encoder/listwise"
+    )
+    reranker_top_n: int = Field(
+        default=5, description="Número de chunks preservados após reranking"
+    )
+    query_rewriter_enabled: bool = Field(
+        default=True, description="Habilitar reescrita contextual de queries multi-turn"
+    )
 
     # Sessão e Limites
     session_ttl_hours: int = Field(default=1, description="TTL em horas para expiração de sessões")

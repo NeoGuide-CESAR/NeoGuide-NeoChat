@@ -1,5 +1,6 @@
 """Módulo RAG (Retrieval-Augmented Generation) e IA Segura da Lumi."""
 
+from lumi.rag.chains import RagContextOrchestrator
 from lumi.rag.guardrails import (
     GuardrailResult,
     check_domain_scope,
@@ -21,18 +22,23 @@ from lumi.rag.prompts import (
     get_chat_prompt_template,
     get_rag_prompt_template,
 )
+from lumi.rag.reranker import NormativeReranker
 from lumi.rag.retriever import (
     NormativeRetriever,
     RetrievalResult,
     RetrievedChunk,
 )
+from lumi.rag.rewriter import QueryRewriter
 
 __all__ = [
     "CONTINGENCY_NO_SOURCES_MESSAGE",
     "CONTINGENCY_NO_SOURCES_PROMPT",
     "GuardrailResult",
     "LUMI_SYSTEM_PROMPT",
+    "NormativeReranker",
     "NormativeRetriever",
+    "QueryRewriter",
+    "RagContextOrchestrator",
     "RetrievalResult",
     "RetrievedChunk",
     "SUPPORTED_EMBEDDING_PROVIDERS",
