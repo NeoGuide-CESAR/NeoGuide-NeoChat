@@ -221,7 +221,9 @@ class TestChatServiceStreaming:
 
         # Validar recusa amigável
         token_data = next(e[1] for e in parsed_events if e[0] == "token")
-        assert "segurança" in token_data["token"].lower() or "recusada" in token_data["token"].lower()
+        assert (
+            "segurança" in token_data["token"].lower() or "recusada" in token_data["token"].lower()
+        )
 
         # Fontes devem estar vazias
         sources_data = next(e[1] for e in parsed_events if e[0] == "sources")
@@ -331,7 +333,9 @@ class TestChatServiceStreaming:
         """Exceções ocorridas na chamada de streaming do LLM devem emitir evento error com código LLM_STREAM_ERROR."""
         failing_llm = MagicMock()
 
-        async def _failing_astream(*args: Any, **kwargs: Any) -> AsyncGenerator[AIMessageChunk, None]:
+        async def _failing_astream(
+            *args: Any, **kwargs: Any
+        ) -> AsyncGenerator[AIMessageChunk, None]:
             yield AIMessageChunk(content="Iniciando...")
             raise RuntimeError("Conexão com a API de IA expirou.")
 
@@ -370,7 +374,9 @@ class TestChatServiceStreaming:
         test_settings: Settings,
     ) -> None:
         """stream_chat deve propagar SessionNotFoundError se a sessão não for encontrada."""
-        mock_session_service.get_session_or_raise.side_effect = SessionNotFoundError("Sessão não existe")
+        mock_session_service.get_session_or_raise.side_effect = SessionNotFoundError(
+            "Sessão não existe"
+        )
 
         chat_service = ChatService(
             session=mock_db_session,
@@ -392,7 +398,9 @@ class TestChatServiceStreaming:
         test_settings: Settings,
     ) -> None:
         """stream_chat deve propagar SessionExpiredError se a sessão tiver expirado."""
-        mock_session_service.get_session_or_raise.side_effect = SessionExpiredError("Sessão expirada")
+        mock_session_service.get_session_or_raise.side_effect = SessionExpiredError(
+            "Sessão expirada"
+        )
 
         chat_service = ChatService(
             session=mock_db_session,

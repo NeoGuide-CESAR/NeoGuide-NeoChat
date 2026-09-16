@@ -162,4 +162,3 @@ class TestQueryRewriterExecution:
         result = await rewriter.rewrite(query=query, chat_history=sample_chat_history)
 
         assert result == query
-

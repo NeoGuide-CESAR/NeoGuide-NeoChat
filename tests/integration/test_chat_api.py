@@ -199,7 +199,9 @@ class TestChatApiExecution:
 
         with (
             patch("lumi.services.chat_service.get_llm", return_value=mock_llm),
-            patch("lumi.services.chat_service.create_rag_orchestrator", return_value=mock_orchestrator),
+            patch(
+                "lumi.services.chat_service.create_rag_orchestrator", return_value=mock_orchestrator
+            ),
         ):
             payload = {
                 "session_id": str(session_id),
@@ -246,16 +248,16 @@ class TestChatApiExecution:
         mock_db.execute.side_effect = _mock_execute
 
         mock_llm = MagicMock()
-        mock_llm.ainvoke = AsyncMock(
-            return_value=MagicMock(content="Resposta técnica síncrona.")
-        )
+        mock_llm.ainvoke = AsyncMock(return_value=MagicMock(content="Resposta técnica síncrona."))
 
         mock_orchestrator = AsyncMock(spec=RagContextOrchestrator)
         mock_orchestrator.get_context.return_value = mock_rag_result
 
         with (
             patch("lumi.services.chat_service.get_llm", return_value=mock_llm),
-            patch("lumi.services.chat_service.create_rag_orchestrator", return_value=mock_orchestrator),
+            patch(
+                "lumi.services.chat_service.create_rag_orchestrator", return_value=mock_orchestrator
+            ),
         ):
             payload = {
                 "session_id": str(session_id),

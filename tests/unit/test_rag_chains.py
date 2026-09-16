@@ -65,10 +65,14 @@ class TestRagContextOrchestrator:
         """Testa o fluxo completo: histórico -> rewriter -> retriever -> reranker -> RetrievalResult."""
         history = [
             HumanMessage(content="Estou projetando um edifício residencial."),
-            AIMessage(content="Certo! Para edifícios de múltiplas unidades aplicamos a DIS-NOR-053."),
+            AIMessage(
+                content="Certo! Para edifícios de múltiplas unidades aplicamos a DIS-NOR-053."
+            ),
         ]
         raw_query = "E qual o ramal para 20 apartamentos?"
-        rewritten_query = "Qual o dimensionamento do ramal de entrada para 20 apartamentos na DIS-NOR-053?"
+        rewritten_query = (
+            "Qual o dimensionamento do ramal de entrada para 20 apartamentos na DIS-NOR-053?"
+        )
 
         mock_rewriter.rewrite.return_value = rewritten_query
 
@@ -210,4 +214,3 @@ class TestRagContextOrchestrator:
 
         mock_reranker.rerank.assert_not_called()
         assert final_result.chunks == []
-

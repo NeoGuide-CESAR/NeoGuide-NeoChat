@@ -43,15 +43,9 @@ def create_rag_orchestrator(
     """Cria a instância padrão de RagContextOrchestrator com retriever, rewriter e reranker."""
     retriever = NormativeRetriever(session=session, settings=settings)
     rewriter = (
-        QueryRewriter(llm=llm, settings=settings)
-        if settings.query_rewriter_enabled
-        else None
+        QueryRewriter(llm=llm, settings=settings) if settings.query_rewriter_enabled else None
     )
-    reranker = (
-        NormativeReranker(llm=llm, settings=settings)
-        if settings.reranker_enabled
-        else None
-    )
+    reranker = NormativeReranker(llm=llm, settings=settings) if settings.reranker_enabled else None
     return RagContextOrchestrator(
         retriever=retriever,
         rewriter=rewriter,
@@ -168,9 +162,7 @@ class ChatService:
 
         # 6. Avaliação de contingência normativa
         if rag_result.is_contingency:
-            contingency_text = (
-                rag_result.contingency_message or CONTINGENCY_NO_SOURCES_MESSAGE
-            )
+            contingency_text = rag_result.contingency_message or CONTINGENCY_NO_SOURCES_MESSAGE
             logger.info(
                 "chat_service_contingency_triggered",
                 session_id=str(request.session_id),
@@ -200,8 +192,7 @@ class ChatService:
                 content = chunk.content if hasattr(chunk, "content") else str(chunk)
                 if isinstance(content, list):
                     token_str = "".join(
-                        str(b.get("text", b) if isinstance(b, dict) else b)
-                        for b in content
+                        str(b.get("text", b) if isinstance(b, dict) else b) for b in content
                     )
                 else:
                     token_str = str(content)
@@ -291,9 +282,7 @@ class ChatService:
 
         # 6. Avaliação de contingência normativa
         if rag_result.is_contingency:
-            contingency_text = (
-                rag_result.contingency_message or CONTINGENCY_NO_SOURCES_MESSAGE
-            )
+            contingency_text = rag_result.contingency_message or CONTINGENCY_NO_SOURCES_MESSAGE
             await self.session_service.add_message(
                 request.session_id,
                 role="assistant",
@@ -316,14 +305,11 @@ class ChatService:
 
         llm_response = await self.llm.ainvoke(prompt_messages)
         response_content = (
-            llm_response.content
-            if hasattr(llm_response, "content")
-            else str(llm_response)
+            llm_response.content if hasattr(llm_response, "content") else str(llm_response)
         )
         if isinstance(response_content, list):
             response_text = "".join(
-                str(b.get("text", b) if isinstance(b, dict) else b)
-                for b in response_content
+                str(b.get("text", b) if isinstance(b, dict) else b) for b in response_content
             )
         else:
             response_text = str(response_content)

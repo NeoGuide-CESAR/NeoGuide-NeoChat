@@ -62,9 +62,7 @@ class NormativeReranker:
         Returns:
             list[RetrievedChunk]: Lista dos top_n fragmentos reordenados.
         """
-        effective_top_n = (
-            top_n if top_n is not None else self.settings.reranker_top_n
-        )
+        effective_top_n = top_n if top_n is not None else self.settings.reranker_top_n
 
         if not chunks:
             return []

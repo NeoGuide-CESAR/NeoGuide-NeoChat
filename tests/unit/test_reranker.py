@@ -39,7 +39,9 @@ def candidate_chunks() -> list[RetrievedChunk]:
     return [
         make_chunk("DIS-NOR-030", "Item 1.0", 0.95, "Introdução e definições gerais de redes."),
         make_chunk("DIS-NOR-030", "Item 5.2", 0.92, "Dimensionamento de ramais de ligação aéreos."),
-        make_chunk("DIS-NOR-053", "Item 4.1", 0.88, "Instalações de entrada em edifícios coletivos."),
+        make_chunk(
+            "DIS-NOR-053", "Item 4.1", 0.88, "Instalações de entrada em edifícios coletivos."
+        ),
         make_chunk("DIS-NOR-030", "Item 5.3", 0.85, "Dimensionamento de ramais subterrâneos."),
         make_chunk("DIS-NOR-053", "Item 6.3", 0.80, "Proteção e medição agrupada em condomínios."),
         make_chunk("DIS-NOR-030", "Item 8.0", 0.75, "Anexos e tabelas de queda de tensão."),
@@ -110,7 +112,9 @@ class TestNormativeRerankerExecution:
         settings = Settings(reranker_enabled=True, reranker_top_n=5)
         reranker = NormativeReranker(llm=mock_llm, settings=settings)
 
-        result = await reranker.rerank(query="Quais as regras para ramais?", chunks=candidate_chunks)
+        result = await reranker.rerank(
+            query="Quais as regras para ramais?", chunks=candidate_chunks
+        )
 
         assert len(result) == 5
         assert result[0].section_code == "Item 5.2"  # chunk 1
