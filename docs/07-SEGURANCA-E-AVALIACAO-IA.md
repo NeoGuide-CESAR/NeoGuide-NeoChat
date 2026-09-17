@@ -106,14 +106,48 @@ Consiste em um catálogo curado pelo time acadêmico e fundamentado nas normas t
 }
 ```
 
-### 4.2. Execucao de Testes via CLI / CI
-Integrado ao pytest e executado via comando de teste de avaliacao:
-- Executa as 50 perguntas do Golden Dataset contra o pipeline RAG;
-- Coleta os contextos recuperados e respostas geradas;
-- Avalia via LLM-as-a-Judge (utilizando Claude ou Gemini) as notas de Faithfulness e Relevance;
-- Gera relatorio consolidado em markdown/HTML com o score final do modelo.
+### 4.2. Execução da Esteira de Avaliação (CLI / Pytest / CI)
+A esteira opera sob arquitetura de **Pipeline Dual** orquestrada por `tests/evals/evaluator.py`, integrando o framework **Ragas**, o paradigma **LLM-as-a-Judge** e verificação determinística de guardrails de segurança:
 
-Se qualquer alteracao de chunking, prompt ou modelo baixar a nota de Faithfulness abaixo de 0.95, a suite de testes alerta a equipe antes de subir para producao.
+1. **Pipeline Dual e Limiares Canônicos:**
+   - **Subconjunto RAG (42 cenários normativos):** Avalia as 4 métricas com metas mínimas estritas:
+     - *Faithfulness (Fidelidade)*: $> 0.95$
+     - *Answer Relevance (Relevância)*: $> 0.90$
+     - *Context Precision (Precisão do Contexto)*: $> 0.85$
+     - *Context Recall (Cobertura do Contexto)*: $> 0.90$
+   - **Subconjunto de Segurança (8 cenários de guardrails):** Avalia respostas para `out_of_scope` e `jailbreak`:
+     - *Safety Pass Rate*: $= 1.0$ (100% de conformidade com as respostas canônicas de recusa `SCOPE_REJECTION_REASON` e `INJECTION_REJECTION_REASON`).
+
+2. **Comandos de Execução via CLI Runner:**
+   O utilitário `tests/evals/run_evals.py` permite avaliações sob demanda e integração em pipelines:
+   ```bash
+   # Execução determinística simulada (Dry-Run, sem consumo de tokens de API)
+   python -m tests.evals.run_evals --dry-run
+
+   # Filtragem por categoria específica (ex.: apenas guardrails de segurança)
+   python -m tests.evals.run_evals --dry-run --category out_of_scope
+
+   # Execução completa com saída em diretório customizado
+   python -m tests.evals.run_evals --dry-run --output-dir tests/evals/results/
+   ```
+
+3. **Execução via Suíte Pytest com Skip Defensivo:**
+   A suíte de testes em `tests/evals/test_rag_evals.py` está registrada com o marker `@pytest.mark.evals`:
+   ```bash
+   # Executa os testes unitários e de conformidade de evals
+   pytest tests/evals/
+
+   # Executa apenas testes marcados como evals
+   pytest -m evals
+   ```
+   *Skip Defensivo Automático:* Caso as variáveis de ambiente `GEMINI_API_KEY` ou `ANTHROPIC_API_KEY` não estejam configuradas (ou as bibliotecas opcionais `ragas` e `datasets` não estejam instaladas), os testes de avaliação ao vivo sofrem skip gracioso automático, permitindo que a suíte de testes da aplicação continue 100% verde em qualquer ambiente.
+
+4. **Artefatos e Relatórios Gerados (`tests/evals/results/`):**
+   A cada execução, o gerador `tests/evals/reporter.py` consolida os resultados em dois formatos:
+   - `eval_summary.json`: Sumário estruturado legível por máquinas com metadados de execução, médias globais e vetor de notas por item;
+   - `eval_report_<timestamp>.md`: Relatório executivo formatado em Markdown com tabelas GFM, status comparativo de metas e auditoria individual de cada caso do Golden Dataset.
+
+Se qualquer alteração de chunking, prompt ou modelo rebaixar o *Faithfulness* abaixo de 0.95 ou violar a taxa de segurança de 1.0, o runner retorna exit code 1 e alerta a equipe antes de qualquer deploy em produção.
 
 ### 4.3. Politica de Acionamento dos Evals
 Para otimizar o consumo de creditos de LLM, os evals **nao sao executados a cada commit**. O acionamento segue **gatilho seletivo**:
