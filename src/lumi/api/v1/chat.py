@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,6 +51,7 @@ async def chat_endpoint(
     request: ChatRequest,
     _auth: Annotated[str, Depends(api_key_and_rate_limit)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    background_tasks: BackgroundTasks,
 ) -> Any:
     """Processa a mensagem do usuário via streaming SSE ou resposta síncrona."""
     session_service = SessionService(session=db)
@@ -82,4 +83,4 @@ async def chat_endpoint(
             },
         )
 
-    return await chat_service.process_chat(request)
+    return await chat_service.process_chat(request, background_tasks=background_tasks)
