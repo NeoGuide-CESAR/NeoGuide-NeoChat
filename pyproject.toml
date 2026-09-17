@@ -37,6 +37,10 @@ dev = [
     "mypy>=1.11.0",
     "pre-commit>=3.8.0",
 ]
+evals = [
+    "ragas>=0.2.0",
+    "datasets>=2.20.0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lumi"]
@@ -93,3 +97,6 @@ asyncio_mode = "auto"
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --strict-markers"
+markers = [
+    "evals: testes de avaliacao de IA com chamadas a LLM e Ragas (consome tokens)",
+]
