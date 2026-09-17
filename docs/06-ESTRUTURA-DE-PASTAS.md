@@ -82,15 +82,18 @@ lumi-neoguide/
 │           ├── chunker.py     # Divisao de texto orientada a tabelas e secoes
 │           └── pipeline.py    # Script executavel de ingestao de normas
 │
-├── tests/                     # Testes automatizados (pytest)
-│   ├── conftest.py            # Fixtures e configuracoes de teste
-│   ├── unit/                  # Testes unitarios isolados
+├── tests/                     # Testes automatizados (pytest com cobertura >= 95%)
+│   ├── conftest.py            # Fixtures assíncronas, rollback de banco e skip defensivo
+│   ├── unit/                  # Testes unitários isolados
 │   │   ├── test_prompts.py
-│   │   └── test_chunker.py
-│   ├── integration/           # Testes de integracao de API e banco
-│   │   ├── test_api_chat.py
-│   │   └── test_vector_search.py
-│   └── evals/                 # Testes de avaliacao de IA e fidelidade RAG
+│   │   ├── test_chunker.py
+│   │   └── test_coverage_boost.py
+│   ├── integration/           # Testes de integração de API, pgvector e suíte E2E
+│   │   ├── test_chat_api.py
+│   │   ├── test_sessions_api.py
+│   │   ├── test_vector_search.py
+│   │   └── test_e2e_flow.py   # Fluxo completo ponta a ponta (sessão, SSE, multi-turn, analytics)
+│   └── evals/                 # Testes de avaliação de IA e fidelidade RAG
 │       ├── golden_dataset.json
 │       └── test_rag_evals.py
 │
