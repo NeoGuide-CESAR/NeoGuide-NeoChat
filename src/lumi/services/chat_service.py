@@ -78,7 +78,9 @@ class ChatService:
             session=self.session,
             settings=self.settings,
         )
-        self.persist_interaction_fn = persist_interaction_fn or persist_interaction_background
+        self.persist_interaction_fn: Callable[..., Any] = (
+            persist_interaction_fn or persist_interaction_background
+        )
 
     @property
     def llm(self) -> BaseChatModel:
@@ -113,31 +115,25 @@ class ChatService:
         top_document_code: str | None,
         top_similarity_score: float | None,
         latency_ms: int,
+        retrieved_chunks: list[Any] | None = None,
     ) -> None:
         """Despacha a rotina de persistência assíncrona via BackgroundTasks ou asyncio.create_task."""
+        kwargs: dict[str, Any] = {
+            "session_id": session_id,
+            "query_text": query_text,
+            "assistant_message": assistant_message,
+            "sources": sources,
+            "top_document_code": top_document_code,
+            "top_similarity_score": top_similarity_score,
+            "latency_ms": latency_ms,
+        }
+        if retrieved_chunks is not None:
+            kwargs["retrieved_chunks"] = retrieved_chunks
+
         if background_tasks is not None:
-            background_tasks.add_task(
-                self.persist_interaction_fn,
-                session_id=session_id,
-                query_text=query_text,
-                assistant_message=assistant_message,
-                sources=sources,
-                top_document_code=top_document_code,
-                top_similarity_score=top_similarity_score,
-                latency_ms=latency_ms,
-            )
+            background_tasks.add_task(self.persist_interaction_fn, **kwargs)
         else:
-            asyncio.create_task(
-                self.persist_interaction_fn(
-                    session_id=session_id,
-                    query_text=query_text,
-                    assistant_message=assistant_message,
-                    sources=sources,
-                    top_document_code=top_document_code,
-                    top_similarity_score=top_similarity_score,
-                    latency_ms=latency_ms,
-                )
-            )
+            asyncio.create_task(self.persist_interaction_fn(**kwargs))
 
     async def stream_chat(self, request: ChatRequest) -> AsyncGenerator[str, None]:
         """Transmite a resposta conversacional em tempo real através de Server-Sent Events (SSE).
@@ -277,6 +273,7 @@ class ChatService:
                     top_document_code=top_doc,
                     top_similarity_score=top_score,
                     latency_ms=latency_ms,
+                    retrieved_chunks=rag_result.chunks,
                 )
             )
 
@@ -411,6 +408,7 @@ class ChatService:
             top_document_code=top_doc,
             top_similarity_score=top_score,
             latency_ms=latency_ms,
+            retrieved_chunks=rag_result.chunks,
         )
 
         return ChatResponse(
