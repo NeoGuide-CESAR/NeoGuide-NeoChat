@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
+import asyncio
+import time
+from collections.abc import AsyncGenerator, Callable
+from typing import TYPE_CHECKING, Any
 
 import structlog
+from fastapi import BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +28,7 @@ from lumi.schemas.chat import (
     StreamSourcesEvent,
     StreamTokenEvent,
 )
+from lumi.services.analytics_service import persist_interaction_background
 from lumi.services.session_service import (
     SessionService,
 )
@@ -63,6 +67,7 @@ class ChatService:
         rag_orchestrator: RagContextOrchestrator | None = None,
         session_service: SessionService | None = None,
         settings: Settings | None = None,
+        persist_interaction_fn: Callable[..., Any] | None = None,
     ) -> None:
         """Inicializa o serviço de chat com injeção de dependências ou inicialização tardia."""
         self.session = session
@@ -73,6 +78,7 @@ class ChatService:
             session=self.session,
             settings=self.settings,
         )
+        self.persist_interaction_fn = persist_interaction_fn or persist_interaction_background
 
     @property
     def llm(self) -> BaseChatModel:
@@ -97,6 +103,42 @@ class ChatService:
         """Formata evento no padrão W3C Server-Sent Events (SSE)."""
         return f"event: {event_type}\ndata: {data.model_dump_json()}\n\n"
 
+    def _dispatch_persistence(
+        self,
+        background_tasks: BackgroundTasks | None,
+        session_id: Any,
+        query_text: str,
+        assistant_message: str,
+        sources: list[dict[str, Any]] | None,
+        top_document_code: str | None,
+        top_similarity_score: float | None,
+        latency_ms: int,
+    ) -> None:
+        """Despacha a rotina de persistência assíncrona via BackgroundTasks ou asyncio.create_task."""
+        if background_tasks is not None:
+            background_tasks.add_task(
+                self.persist_interaction_fn,
+                session_id=session_id,
+                query_text=query_text,
+                assistant_message=assistant_message,
+                sources=sources,
+                top_document_code=top_document_code,
+                top_similarity_score=top_similarity_score,
+                latency_ms=latency_ms,
+            )
+        else:
+            asyncio.create_task(
+                self.persist_interaction_fn(
+                    session_id=session_id,
+                    query_text=query_text,
+                    assistant_message=assistant_message,
+                    sources=sources,
+                    top_document_code=top_document_code,
+                    top_similarity_score=top_similarity_score,
+                    latency_ms=latency_ms,
+                )
+            )
+
     async def stream_chat(self, request: ChatRequest) -> AsyncGenerator[str, None]:
         """Transmite a resposta conversacional em tempo real através de Server-Sent Events (SSE).
 
@@ -108,8 +150,10 @@ class ChatService:
         5. Recuperação contextual RAG (reescrita, busca vetorial e reranking).
         6. Resposta de contingência imediata caso não haja fontes suficientes.
         7. Geração streaming de tokens pela LLM com emissão progressiva de eventos token.
-        8. Emissão de evento sources e done com encerramento e persistência transacional.
+        8. Emissão de eventos sources e done, seguida de despacho de persistência e telemetria em background.
         """
+        start_time = time.perf_counter()
+
         # 1. Validação de sessão ativa e expiração TTL
         await self.session_service.get_session_or_raise(request.session_id, check_ttl=True)
 
@@ -130,15 +174,23 @@ class ChatService:
                 role="user",
                 content=guard_result.sanitized_text,
             )
-            await self.session_service.add_message(
-                request.session_id,
-                role="assistant",
-                content=rejection_text,
-                sources=[],
-            )
             yield self._format_sse("token", StreamTokenEvent(token=rejection_text))
             yield self._format_sse("sources", StreamSourcesEvent(sources=[]))
             yield self._format_sse("done", StreamDoneEvent(session_id=request.session_id))
+
+            # Despacho em background pós-evento done
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            asyncio.create_task(
+                self.persist_interaction_fn(
+                    session_id=request.session_id,
+                    query_text=guard_result.sanitized_text,
+                    assistant_message=rejection_text,
+                    sources=[],
+                    top_document_code=None,
+                    top_similarity_score=None,
+                    latency_ms=latency_ms,
+                )
+            )
             return
 
         # 3. Histórico multi-turn recente anterior à pergunta atual
@@ -167,15 +219,23 @@ class ChatService:
                 "chat_service_contingency_triggered",
                 session_id=str(request.session_id),
             )
-            await self.session_service.add_message(
-                request.session_id,
-                role="assistant",
-                content=contingency_text,
-                sources=[],
-            )
             yield self._format_sse("token", StreamTokenEvent(token=contingency_text))
             yield self._format_sse("sources", StreamSourcesEvent(sources=[]))
             yield self._format_sse("done", StreamDoneEvent(session_id=request.session_id))
+
+            # Despacho em background pós-evento done
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            asyncio.create_task(
+                self.persist_interaction_fn(
+                    session_id=request.session_id,
+                    query_text=guard_result.sanitized_text,
+                    assistant_message=contingency_text,
+                    sources=[],
+                    top_document_code=None,
+                    top_similarity_score=None,
+                    latency_ms=latency_ms,
+                )
+            )
             return
 
         # 7. Geração generativa streaming via LLM
@@ -204,12 +264,20 @@ class ChatService:
             yield self._format_sse("sources", StreamSourcesEvent(sources=rag_result.sources))
             yield self._format_sse("done", StreamDoneEvent(session_id=request.session_id))
 
-            # Persiste resposta completa do assistente com fontes normativas associadas
-            await self.session_service.add_message(
-                request.session_id,
-                role="assistant",
-                content=full_response,
-                sources=[s.model_dump() for s in rag_result.sources],
+            # Despacho em background pós-evento done
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            top_doc = rag_result.sources[0].document_code if rag_result.sources else None
+            top_score = rag_result.sources[0].relevance_score if rag_result.sources else None
+            asyncio.create_task(
+                self.persist_interaction_fn(
+                    session_id=request.session_id,
+                    query_text=guard_result.sanitized_text,
+                    assistant_message=full_response,
+                    sources=[s.model_dump() for s in rag_result.sources],
+                    top_document_code=top_doc,
+                    top_similarity_score=top_score,
+                    latency_ms=latency_ms,
+                )
             )
 
         except Exception as exc:
@@ -227,8 +295,14 @@ class ChatService:
                 ),
             )
 
-    async def process_chat(self, request: ChatRequest) -> ChatResponse:
-        """Processa a mensagem de forma síncrona retornando payload consolidado ChatResponse."""
+    async def process_chat(
+        self,
+        request: ChatRequest,
+        background_tasks: BackgroundTasks | None = None,
+    ) -> ChatResponse:
+        """Processa a mensagem de forma síncrona agendando persistência e telemetria em background."""
+        start_time = time.perf_counter()
+
         # 1. Validação de sessão ativa e TTL
         await self.session_service.get_session_or_raise(request.session_id, check_ttl=True)
 
@@ -249,11 +323,16 @@ class ChatService:
                 role="user",
                 content=guard_result.sanitized_text,
             )
-            await self.session_service.add_message(
-                request.session_id,
-                role="assistant",
-                content=rejection_text,
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            self._dispatch_persistence(
+                background_tasks=background_tasks,
+                session_id=request.session_id,
+                query_text=guard_result.sanitized_text,
+                assistant_message=rejection_text,
                 sources=[],
+                top_document_code=None,
+                top_similarity_score=None,
+                latency_ms=latency_ms,
             )
             return ChatResponse(
                 session_id=request.session_id,
@@ -283,11 +362,16 @@ class ChatService:
         # 6. Avaliação de contingência normativa
         if rag_result.is_contingency:
             contingency_text = rag_result.contingency_message or CONTINGENCY_NO_SOURCES_MESSAGE
-            await self.session_service.add_message(
-                request.session_id,
-                role="assistant",
-                content=contingency_text,
+            latency_ms = int((time.perf_counter() - start_time) * 1000)
+            self._dispatch_persistence(
+                background_tasks=background_tasks,
+                session_id=request.session_id,
+                query_text=guard_result.sanitized_text,
+                assistant_message=contingency_text,
                 sources=[],
+                top_document_code=None,
+                top_similarity_score=None,
+                latency_ms=latency_ms,
             )
             return ChatResponse(
                 session_id=request.session_id,
@@ -314,11 +398,19 @@ class ChatService:
         else:
             response_text = str(response_content)
 
-        await self.session_service.add_message(
-            request.session_id,
-            role="assistant",
-            content=response_text,
+        latency_ms = int((time.perf_counter() - start_time) * 1000)
+        top_doc = rag_result.sources[0].document_code if rag_result.sources else None
+        top_score = rag_result.sources[0].relevance_score if rag_result.sources else None
+
+        self._dispatch_persistence(
+            background_tasks=background_tasks,
+            session_id=request.session_id,
+            query_text=guard_result.sanitized_text,
+            assistant_message=response_text,
             sources=[s.model_dump() for s in rag_result.sources],
+            top_document_code=top_doc,
+            top_similarity_score=top_score,
+            latency_ms=latency_ms,
         )
 
         return ChatResponse(
