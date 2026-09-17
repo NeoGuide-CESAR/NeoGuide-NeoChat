@@ -164,7 +164,9 @@ class TestAnalyticsServiceCoverage:
             async def __aexit__(self, *args):
                 pass
 
-        with patch("lumi.services.analytics_service.get_db_session", return_value=MockContextManager()):
+        with patch(
+            "lumi.services.analytics_service.get_db_session", return_value=MockContextManager()
+        ):
             success = await persist_interaction_background(
                 session_id=session_id,
                 query_text="Pergunta com citação não fundamentada",
@@ -191,7 +193,9 @@ class TestAnalyticsServiceCoverage:
             async def __aexit__(self, *args):
                 pass
 
-        with patch("lumi.services.analytics_service.get_db_session", return_value=ErrorContextManager()):
+        with patch(
+            "lumi.services.analytics_service.get_db_session", return_value=ErrorContextManager()
+        ):
             success = await persist_interaction_background(
                 session_id=session_id,
                 query_text="Pergunta",
@@ -325,7 +329,10 @@ class TestIngestionPipelineCoverage:
         fake_file = tmp_path / "fake.txt"
         fake_file.write_text("conteúdo inválido")
 
-        with patch("lumi.ingestion.pipeline.parse_document", side_effect=ValueError("Formato não suportado")):
+        with patch(
+            "lumi.ingestion.pipeline.parse_document",
+            side_effect=ValueError("Formato não suportado"),
+        ):
             result = await ingest_normative_file(fake_file, raise_on_error=False)
             assert result.status == "error"
             assert "Formato não suportado" in result.error_message

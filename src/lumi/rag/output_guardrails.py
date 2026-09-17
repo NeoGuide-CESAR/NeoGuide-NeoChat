@@ -223,9 +223,7 @@ def validate_output(
     hallucinated_citations: list[str] = []
 
     for cite_doc, cite_sec in citations:
-        formatted_cite = (
-            f"[Fonte: {cite_doc}, {cite_sec}]" if cite_sec else f"[Fonte: {cite_doc}]"
-        )
+        formatted_cite = f"[Fonte: {cite_doc}, {cite_sec}]" if cite_sec else f"[Fonte: {cite_doc}]"
 
         # Filtra chunks pertencentes ao documento citado
         matching_chunks = [c for c in chunks_data if c[0] == cite_doc]

@@ -321,7 +321,8 @@ class TestOutputAuditBackgroundIntegration:
 
             # O worker de background deve ter emitido o alerta com ambas as violações
             violation_calls = [
-                c for c in mock_analytics_logger.warning.call_args_list
+                c
+                for c in mock_analytics_logger.warning.call_args_list
                 if c.args and c.args[0] == "output_guardrail_violation"
             ]
             assert len(violation_calls) == 1

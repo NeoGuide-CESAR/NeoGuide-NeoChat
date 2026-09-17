@@ -147,7 +147,9 @@ class TestEndToEndFlow:
 
             mock_llm_stream = MagicMock()
 
-            async def _stream_tokens(*args: Any, **kwargs: Any) -> AsyncGenerator[AIMessageChunk, None]:
+            async def _stream_tokens(
+                *args: Any, **kwargs: Any
+            ) -> AsyncGenerator[AIMessageChunk, None]:
                 yield AIMessageChunk(content="De acordo com a DIS-NOR-030, ")
                 yield AIMessageChunk(content="a distância vertical de segurança é 5,5m.")
 
@@ -194,7 +196,9 @@ class TestEndToEndFlow:
                     parsed_events.append((event_type, data_dict))
 
                 # Valida eventos de token
-                token_contents = [data["token"] for ev, data in parsed_events if ev == "token" and "token" in data]
+                token_contents = [
+                    data["token"] for ev, data in parsed_events if ev == "token" and "token" in data
+                ]
                 full_stream_text = "".join(token_contents)
                 assert "5,5m" in full_stream_text
 
@@ -258,7 +262,9 @@ class TestEndToEndFlow:
                     "lumi.api.v1.chat.ChatService",
                     side_effect=lambda *args, **kwargs: __import__(
                         "lumi.services.chat_service", fromlist=["ChatService"]
-                    ).ChatService(*args, **{**kwargs, "persist_interaction_fn": mock_persist_turn2}),
+                    ).ChatService(
+                        *args, **{**kwargs, "persist_interaction_fn": mock_persist_turn2}
+                    ),
                 ),
             ):
                 turn2_payload = {

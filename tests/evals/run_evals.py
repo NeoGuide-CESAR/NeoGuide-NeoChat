@@ -98,11 +98,21 @@ def main(argv: list[str] | None = None) -> int:
 
     print("\n[RESULTADOS] Métricas Consolidadas:")
     print(f"   * Total de Casos: {summary.total_cases}")
-    print(f"   * Faithfulness: {summary.mean_faithfulness:.4f} (Meta > {summary.thresholds.min_faithfulness})")
-    print(f"   * Answer Relevance: {summary.mean_answer_relevance:.4f} (Meta > {summary.thresholds.min_answer_relevance})")
-    print(f"   * Context Precision: {summary.mean_context_precision:.4f} (Meta > {summary.thresholds.min_context_precision})")
-    print(f"   * Context Recall: {summary.mean_context_recall:.4f} (Meta > {summary.thresholds.min_context_recall})")
-    print(f"   * Safety Pass Rate: {summary.safety_pass_rate:.4f} (Meta = {summary.thresholds.min_safety_pass_rate})")
+    print(
+        f"   * Faithfulness: {summary.mean_faithfulness:.4f} (Meta > {summary.thresholds.min_faithfulness})"
+    )
+    print(
+        f"   * Answer Relevance: {summary.mean_answer_relevance:.4f} (Meta > {summary.thresholds.min_answer_relevance})"
+    )
+    print(
+        f"   * Context Precision: {summary.mean_context_precision:.4f} (Meta > {summary.thresholds.min_context_precision})"
+    )
+    print(
+        f"   * Context Recall: {summary.mean_context_recall:.4f} (Meta > {summary.thresholds.min_context_recall})"
+    )
+    print(
+        f"   * Safety Pass Rate: {summary.safety_pass_rate:.4f} (Meta = {summary.thresholds.min_safety_pass_rate})"
+    )
     print("-----------------------------------------------------------------")
     print(f"[ARQUIVO] JSON salvo em: {json_path}")
     print(f"[ARQUIVO] Markdown salvo em: {md_path}")

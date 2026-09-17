@@ -14,7 +14,9 @@ def make_embedding(dominant_index: int, dim: int = 768) -> list[float]:
     return vec
 
 
-def make_blended_embedding(idx1: int, idx2: int, weight1: float, weight2: float, dim: int = 768) -> list[float]:
+def make_blended_embedding(
+    idx1: int, idx2: int, weight1: float, weight2: float, dim: int = 768
+) -> list[float]:
     """Gera um vetor normalizado sintético com pesos em duas coordenadas conhecidas."""
     import math
 

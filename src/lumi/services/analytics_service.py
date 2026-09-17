@@ -107,15 +107,17 @@ async def persist_interaction_background(
             cites = extract_citations(hal)
             doc = cites[0][0] if cites else "AUDIT"
             sec = cites[0][1] if cites else "Item Inválido"
-            persisted_sources.append({
-                "document_code": doc,
-                "revision": "",
-                "section": sec or "Geral",
-                "page": 1,
-                "relevance_score": 0.0,
-                "snippet": hal,
-                "audit_flags": guardrail_result.warning_flags,
-            })
+            persisted_sources.append(
+                {
+                    "document_code": doc,
+                    "revision": "",
+                    "section": sec or "Geral",
+                    "page": 1,
+                    "relevance_score": 0.0,
+                    "snippet": hal,
+                    "audit_flags": guardrail_result.warning_flags,
+                }
+            )
 
     total_attempts = 1 + max_retries
     attempts = 0

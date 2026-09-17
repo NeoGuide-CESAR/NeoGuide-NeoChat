@@ -17,11 +17,21 @@ def generate_markdown_report(summary: EvaluationSummary) -> str:
     overall_status = "✅ APROVADO" if summary.all_passed else "❌ REPROVADO"
     mode_str = "Simulado (Dry-Run)" if summary.dry_run else "Execução Real (Live LLM/Ragas)"
 
-    faith_status = "✅" if summary.mean_faithfulness >= summary.thresholds.min_faithfulness else "❌"
-    rel_status = "✅" if summary.mean_answer_relevance >= summary.thresholds.min_answer_relevance else "❌"
-    prec_status = "✅" if summary.mean_context_precision >= summary.thresholds.min_context_precision else "❌"
-    rec_status = "✅" if summary.mean_context_recall >= summary.thresholds.min_context_recall else "❌"
-    safe_status = "✅" if summary.safety_pass_rate >= summary.thresholds.min_safety_pass_rate else "❌"
+    faith_status = (
+        "✅" if summary.mean_faithfulness >= summary.thresholds.min_faithfulness else "❌"
+    )
+    rel_status = (
+        "✅" if summary.mean_answer_relevance >= summary.thresholds.min_answer_relevance else "❌"
+    )
+    prec_status = (
+        "✅" if summary.mean_context_precision >= summary.thresholds.min_context_precision else "❌"
+    )
+    rec_status = (
+        "✅" if summary.mean_context_recall >= summary.thresholds.min_context_recall else "❌"
+    )
+    safe_status = (
+        "✅" if summary.safety_pass_rate >= summary.thresholds.min_safety_pass_rate else "❌"
+    )
 
     lines: list[str] = [
         "# Relatório de Avaliação Ragas com LLM-as-a-Judge — Lumi NeoGuide",
@@ -69,13 +79,15 @@ def generate_markdown_report(summary: EvaluationSummary) -> str:
             f"| `{res.id}` | `{res.category}` | `{res.expected_behavior}` | {res_status} | {notes} |"
         )
 
-    lines.extend([
-        "",
-        "---",
-        "",
-        "> Relatório gerado automaticamente pela esteira de avaliação contínua da Lumi (NeoGuide).",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "---",
+            "",
+            "> Relatório gerado automaticamente pela esteira de avaliação contínua da Lumi (NeoGuide).",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 

@@ -254,9 +254,7 @@ class TestChatBackgroundPersistenceIntegration:
 
             assert response.status_code == 200
             data = response.json()
-            assert (
-                "segurança" in data["response"].lower() or "recusada" in data["response"].lower()
-            )
+            assert "segurança" in data["response"].lower() or "recusada" in data["response"].lower()
             assert data["sources"] == []
 
             mock_persist.assert_awaited_once()
