@@ -1,0 +1,27 @@
+# Tasks: Suíte de Testes Unitários e de Integração de API (TECH-08)
+
+- [x] 1. Configuração de Dependências e Markers de Teste <!-- id: 0 -->
+  - [x] 1.1 Adicionar `pytest-cov>=5.0.0` no grupo dev do `pyproject.toml` <!-- id: 1 -->
+  - [x] 1.2 Registrar markers `integration` e `evals` com descrições no `pyproject.toml` <!-- id: 2 -->
+  - [x] 1.3 Configurar `addopts = "-v --strict-markers"` no `pyproject.toml` <!-- id: 3 -->
+- [x] 2. Fixtures de Banco de Dados e Integração em `tests/conftest.py` <!-- id: 4 -->
+  - [x] 2.1 Implementar verificação assíncrona de disponibilidade do PostgreSQL <!-- id: 5 -->
+  - [x] 2.2 Criar fixture `db_session` com rollback automático e skip gracioso sob indisponibilidade <!-- id: 6 -->
+- [x] 3. Implementação dos Testes de Busca Vetorial (`tests/integration/test_vector_search.py`) <!-- id: 7 -->
+  - [x] 3.1 Implementar testes marcados com `@pytest.mark.integration` cobrindo inserção no pgvector <!-- id: 8 -->
+  - [x] 3.2 Testar busca por similaridade de cosseno e filtro de threshold 0.70 <!-- id: 9 -->
+  - [x] 3.3 Testar isolamento de documentos por `document_code` <!-- id: 10 -->
+- [x] 4. Implementação da Suíte E2E (`tests/integration/test_e2e_flow.py`) <!-- id: 11 -->
+  - [x] 4.1 Testar fluxo ponta a ponta: `/health` -> `POST /api/v1/sessions` <!-- id: 12 -->
+  - [x] 4.2 Testar primeiro turno via streaming SSE (`POST /api/v1/chat`), consumindo tokens e fontes <!-- id: 13 -->
+  - [x] 4.3 Testar segundo turno multi-turn preservando histórico e fontes <!-- id: 14 -->
+  - [x] 4.4 Testar telemetria analítica assíncrona (`normative_query_analytics`) e validação de TTL <!-- id: 15 -->
+- [x] 5. Fechamento de Cobertura (Meta >= 95%) e Testes Unitários Complementares <!-- id: 16 -->
+  - [x] 5.1 Adicionar testes unitários para ramos não cobertos em `src/lumi/db/models.py` e `src/lumi/db/session.py` <!-- id: 17 -->
+  - [x] 5.2 Adicionar testes unitários para `src/lumi/api/deps.py` e `src/lumi/services/analytics_service.py` <!-- id: 18 -->
+  - [x] 5.3 Adicionar testes unitários para `src/lumi/ingestion/` (chunker, parser, pipeline) <!-- id: 19 -->
+  - [x] 5.4 Executar medição e verificar meta >= 95% total (alcançado 98%) <!-- id: 20 -->
+- [x] 6. Atualização de Documentação e Qualidade <!-- id: 21 -->
+  - [x] 6.1 Atualizar `docs/06-ESTRUTURA-DE-PASTAS.md` refletindo os testes de integração e suíte E2E <!-- id: 22 -->
+  - [x] 6.2 Validar ruff, mypy e pytest 100% <!-- id: 23 -->
+  - [x] 6.3 Sincronizar canonical spec e arquivar change <!-- id: 24 -->
