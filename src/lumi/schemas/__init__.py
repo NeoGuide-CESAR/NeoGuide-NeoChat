@@ -9,6 +9,12 @@ from lumi.schemas.chat import (
     StreamSourcesEvent,
     StreamTokenEvent,
 )
+from lumi.schemas.evals import (
+    DatasetCategory,
+    ExpectedBehavior,
+    GoldenDataset,
+    GoldenDatasetItem,
+)
 from lumi.schemas.health import (
     DatabaseHealthInfo,
     HealthCheckResponse,
@@ -24,6 +30,10 @@ __all__ = [
     "ChatRequest",
     "ChatResponse",
     "DatabaseHealthInfo",
+    "DatasetCategory",
+    "ExpectedBehavior",
+    "GoldenDataset",
+    "GoldenDatasetItem",
     "HealthCheckResponse",
     "SessionCreateResponse",
     "SessionDetailResponse",

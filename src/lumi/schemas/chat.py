@@ -40,6 +40,10 @@ class SourceMetadata(BaseModel):
         default="",
         description="Trecho textual relevante extraído da norma",
     )
+    audit_flags: list[str] = Field(
+        default_factory=list,
+        description="Flags de auditoria de guardrails de saída",
+    )
 
 
 class ChatRequest(BaseModel):

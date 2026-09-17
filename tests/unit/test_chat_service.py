@@ -172,19 +172,13 @@ class TestChatServiceStreaming:
         done_event = next(e[1] for e in parsed_events if e[0] == "done")
         assert done_event["session_id"] == str(session_id)
 
-        # 5. Validar persistência no session_service
-        assert mock_session_service.add_message.call_count == 2
-        # Primeira chamada: mensagem do usuário
-        mock_session_service.add_message.assert_any_call(
+        # 5. Validar persistência da mensagem do usuário no session_service
+        assert mock_session_service.add_message.call_count == 1
+        mock_session_service.add_message.assert_called_once_with(
             session_id,
             role="user",
             content="Qual é a queda de tensão máxima no ramal predial?",
         )
-        # Segunda chamada: mensagem do assistente com fontes
-        last_call = mock_session_service.add_message.call_args
-        assert last_call.kwargs["role"] == "assistant"
-        assert "5%" in last_call.kwargs["content"]
-        assert len(last_call.kwargs["sources"]) == 1
 
     @pytest.mark.asyncio
     async def test_stream_chat_guardrail_violation_injection(
@@ -232,8 +226,8 @@ class TestChatServiceStreaming:
         # RAG e LLM não devem ser invocados
         mock_rag_orchestrator.get_context.assert_not_called()
 
-        # Mensagens do usuário e assistente devem ter sido salvas
-        assert mock_session_service.add_message.call_count == 2
+        # Apenas mensagem do usuário gravada no session_service (resposta vai em background)
+        assert mock_session_service.add_message.call_count == 1
 
     @pytest.mark.asyncio
     async def test_stream_chat_guardrail_violation_out_of_scope(
@@ -268,7 +262,7 @@ class TestChatServiceStreaming:
         assert "fora do escopo" in token_data["token"]
 
         mock_rag_orchestrator.get_context.assert_not_called()
-        assert mock_session_service.add_message.call_count == 2
+        assert mock_session_service.add_message.call_count == 1
 
     @pytest.mark.asyncio
     async def test_stream_chat_contingency_response(
@@ -314,12 +308,11 @@ class TestChatServiceStreaming:
         done_data = next(e[1] for e in parsed_events if e[0] == "done")
         assert done_data["session_id"] == str(session_id)
 
-        # Mensagem do assistente salva com a contingência
-        mock_session_service.add_message.assert_any_call(
+        # Mensagem do usuário salva no session_service
+        mock_session_service.add_message.assert_called_once_with(
             session_id,
-            role="assistant",
-            content=CONTINGENCY_NO_SOURCES_MESSAGE,
-            sources=[],
+            role="user",
+            content="Qual norma trata de cabos submarinos nucleares na Neoenergia?",
         )
 
     @pytest.mark.asyncio
@@ -451,8 +444,13 @@ class TestChatServiceSync:
         assert response.sources[0].document_code == "DIS-NOR-030"
         assert isinstance(response.created_at, datetime)
 
-        # Mensagens salvas
-        assert mock_session_service.add_message.call_count == 2
+        # Mensagem do usuário salva no session_service
+        assert mock_session_service.add_message.call_count == 1
+        mock_session_service.add_message.assert_called_once_with(
+            session_id,
+            role="user",
+            content="Como dimensionar a proteção geral?",
+        )
 
     @pytest.mark.asyncio
     async def test_process_chat_guardrail_violation(

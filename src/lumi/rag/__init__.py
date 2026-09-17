@@ -15,6 +15,12 @@ from lumi.rag.llm_factory import (
     get_llm,
     validate_embedding_dimension,
 )
+from lumi.rag.output_guardrails import (
+    OutputGuardrailResult,
+    check_calculation_safeguard,
+    extract_citations,
+    validate_output,
+)
 from lumi.rag.prompts import (
     CONTINGENCY_NO_SOURCES_MESSAGE,
     CONTINGENCY_NO_SOURCES_PROMPT,
@@ -37,14 +43,17 @@ __all__ = [
     "LUMI_SYSTEM_PROMPT",
     "NormativeReranker",
     "NormativeRetriever",
+    "OutputGuardrailResult",
     "QueryRewriter",
     "RagContextOrchestrator",
     "RetrievalResult",
     "RetrievedChunk",
     "SUPPORTED_EMBEDDING_PROVIDERS",
     "SUPPORTED_LLM_PROVIDERS",
+    "check_calculation_safeguard",
     "check_domain_scope",
     "detect_prompt_injection",
+    "extract_citations",
     "get_chat_prompt_template",
     "get_embeddings",
     "get_llm",
@@ -52,4 +61,5 @@ __all__ = [
     "sanitize_pii",
     "validate_embedding_dimension",
     "validate_input",
+    "validate_output",
 ]
