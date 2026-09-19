@@ -8,7 +8,7 @@ from collections.abc import AsyncGenerator, Callable
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -201,6 +201,7 @@ class ChatService:
             role="user",
             content=guard_result.sanitized_text,
         )
+        await self.session.commit()
 
         # 5. Execução do pipeline RAG
         rag_result = await self.rag_orchestrator.get_context(
@@ -349,6 +350,7 @@ class ChatService:
             role="user",
             content=guard_result.sanitized_text,
         )
+        await self.session.commit()
 
         # 5. Execução do pipeline RAG
         rag_result = await self.rag_orchestrator.get_context(
@@ -376,7 +378,7 @@ class ChatService:
                 sources=[],
             )
 
-        # 7. Invocação síncrona do LLM
+        # 7. Invocação síncrona do LLM com tratamento defensivo
         prompt_template = get_rag_prompt_template()
         prompt_messages = prompt_template.format_messages(
             context=rag_result.formatted_context,
@@ -384,16 +386,31 @@ class ChatService:
             question=guard_result.sanitized_text,
         )
 
-        llm_response = await self.llm.ainvoke(prompt_messages)
-        response_content = (
-            llm_response.content if hasattr(llm_response, "content") else str(llm_response)
-        )
-        if isinstance(response_content, list):
-            response_text = "".join(
-                str(b.get("text", b) if isinstance(b, dict) else b) for b in response_content
+        try:
+            llm_response = await self.llm.ainvoke(prompt_messages)
+            response_content = (
+                llm_response.content if hasattr(llm_response, "content") else str(llm_response)
             )
-        else:
-            response_text = str(response_content)
+            if isinstance(response_content, list):
+                response_text = "".join(
+                    str(b.get("text", b) if isinstance(b, dict) else b) for b in response_content
+                )
+            else:
+                response_text = str(response_content)
+        except Exception as exc:
+            logger.error(
+                "chat_service_llm_invoke_error",
+                session_id=str(request.session_id),
+                error=str(exc),
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "O modelo de inteligência artificial está temporariamente sobrecarregado "
+                    "(HTTP 503 do provedor). Por favor, tente novamente em alguns segundos."
+                ),
+            ) from exc
 
         latency_ms = int((time.perf_counter() - start_time) * 1000)
         top_doc = rag_result.sources[0].document_code if rag_result.sources else None

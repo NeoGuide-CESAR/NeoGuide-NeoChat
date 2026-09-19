@@ -22,27 +22,40 @@ Desenvolvido para engenheiros de campo, projetistas e técnicos de infraestrutur
 ### 2. Configuração do Ambiente
 ```bash
 cp .env.example .env
+# Adicione sua chave GEMINI_API_KEY no arquivo .env
 ```
 
-### 3. Instalação de Dependências e Execução Local
+### 3. Banco de Dados, Migrações e Ingestão de Normas
 ```bash
-# Sincronizar dependências com uv
-uv sync
+# Iniciar o PostgreSQL 16 com pgvector
+docker compose up -d lumi-db
 
-# Executar a API localmente
+# Sincronizar dependências com uv (incluindo testes e linters)
+uv sync --extra dev
+
+# Executar as migrações estruturais do banco de dados
+uv run alembic upgrade head
+
+# Ingerir e indexar as normas técnicas (DIS-NOR-030 e DIS-NOR-053) no pgvector
+uv run python -m lumi.ingestion --path docs/info --all
+```
+
+### 4. Execução da API Localmente
+```bash
+# Executar a API FastAPI com hot-reload
 uv run uvicorn src.lumi.main:app --reload --port 8000
 ```
 
-### 4. Execução de Testes
+Documentação interativa disponível em `http://localhost:8000/docs`.
+
+### 5. Execução de Testes e Qualidade
 ```bash
+# Executar suite completa de testes
 uv run pytest
+
+# Verificação com linters e checagem de tipos
+uv run ruff check .
+uv run mypy src
 ```
 
-### 5. Qualidade de Código e Pre-commit Hooks
-```bash
-# Instalar os hooks no repositório git local
-uv run pre-commit install
-
-# Executar manualmente a validação em todos os arquivos
-uv run pre-commit run --all-files
-```
+> 📖 **Guia Completo:** Para instruções detalhadas com exemplos de cURL, streaming SSE, PowerShell e troubleshooting, consulte o [08. Guia de Configuração e Execução Local](docs/08-CONFIGURACAO-E-EXECUCAO-LOCAL.md).

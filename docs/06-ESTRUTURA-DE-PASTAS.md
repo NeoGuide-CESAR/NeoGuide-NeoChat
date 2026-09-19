@@ -27,6 +27,7 @@ lumi-neoguide/
 │   ├── 05-ARQUITETURA.md
 │   ├── 06-ESTRUTURA-DE-PASTAS.md
 │   ├── 07-SEGURANCA-E-AVALIACAO-IA.md
+│   ├── 08-CONFIGURACAO-E-EXECUCAO-LOCAL.md
 │   └── info/                  # Materiais normativos brutos (DIS-NOR-030, DIS-NOR-053)
 │
 ├── planner/                   # Gestao agil de tarefas e backlog (Kanban + Roadmaps)

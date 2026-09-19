@@ -34,6 +34,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@lumi-db:5432/lumi_db
       API_HOST: 0.0.0.0

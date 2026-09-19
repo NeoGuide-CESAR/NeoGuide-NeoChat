@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import re
 import sys
 import time
 from pathlib import Path
@@ -36,23 +37,39 @@ class IngestionResult(BaseModel):
     )
 
 
+def _extract_retry_delay(exc: Exception, fallback_backoff: float) -> float:
+    """Extrai o tempo de espera recomendado da mensagem de erro 429/RESOURCE_EXHAUSTED."""
+    exc_str = str(exc)
+    # Procura 'retry in XX.Xs' retornado pela API do Google
+    match_retry_in = re.search(r"retry in (\d+(?:\.\d+)?)s", exc_str, re.IGNORECASE)
+    if match_retry_in:
+        return float(match_retry_in.group(1)) + 1.0
+
+    # Procura "retryDelay': 'XXs'"
+    match_retry_delay = re.search(r"retryDelay['\"]?\s*:\s*['\"]?(\d+)s", exc_str, re.IGNORECASE)
+    if match_retry_delay:
+        return float(match_retry_delay.group(1)) + 1.0
+
+    return fallback_backoff
+
+
 async def generate_embeddings_with_retry(
     texts: list[str],
     provider: str | None = None,
-    batch_size: int = 32,
-    max_retries: int = 3,
-    retry_backoffs: tuple[float, ...] = (1.0, 2.0, 4.0),
-    batch_delay: float = 0.2,
+    batch_size: int = 64,
+    max_retries: int = 5,
+    retry_backoffs: tuple[float, ...] = (1.0, 2.0, 4.0, 8.0, 16.0),
+    batch_delay: float = 0.5,
     embedding_service: Any = None,
 ) -> list[list[float]]:
-    """Gera embeddings em lotes com rate limiting defensivo e retentativas com backoff exponencial.
+    """Gera embeddings em lotes com rate limiting defensivo e retentativas adaptativas.
 
     Args:
         texts: Lista de conteúdos textuais a serem vetorizados.
         provider: Nome do provedor de embeddings ("gemini" ou "fake").
-        batch_size: Quantidade de fragmentos por requisição ao provedor.
+        batch_size: Quantidade de fragmentos por requisição ao provedor (padrão: 64).
         max_retries: Número máximo de tentativas por lote em caso de falha transitória / 429.
-        retry_backoffs: Delays de espera em segundos para cada tentativa.
+        retry_backoffs: Delays base de espera em segundos para cada tentativa.
         batch_delay: Intervalo defensivo de respiro em segundos entre lotes subsequentes.
         embedding_service: Serviço de embeddings opcional (injetável para testes).
 
@@ -89,20 +106,35 @@ async def generate_embeddings_with_retry(
                         error=str(exc),
                     )
                     raise
-                backoff = (
+
+                base_backoff = (
                     retry_backoffs[attempt] if attempt < len(retry_backoffs) else retry_backoffs[-1]
                 )
+                backoff = _extract_retry_delay(exc, base_backoff)
+
                 logger.warning(
-                    "Falha temporária ao gerar embeddings; retentando...",
+                    "Falha temporária ao gerar embeddings; retentando com backoff...",
                     batch_index=batch_index,
                     attempt=attempt + 1,
-                    backoff_seconds=backoff,
+                    backoff_seconds=round(backoff, 2),
                     error=str(exc),
                 )
+                if backoff > 5.0:
+                    print(
+                        f"\n[RATE LIMIT] Limite da cota do Google atingido. "
+                        f"Aguardando {backoff:.1f}s para reiniciar lote {batch_index}/{total_batches}...",
+                        flush=True,
+                    )
                 await asyncio.sleep(backoff)
 
         if batch_vectors is not None:
             all_embeddings.extend(batch_vectors)
+            print(
+                f"\n[PROGRESSO] Lote {batch_index}/{total_batches} finalizado "
+                f"({len(all_embeddings)}/{total_texts} chunks vetorizados)...",
+                end="",
+                flush=True,
+            )
 
         # Rate limiting defensivo entre lotes (não aguarda após o último lote)
         if i + batch_size < total_texts and batch_delay > 0:
@@ -228,9 +260,19 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "path",
+        "positional_path",
+        nargs="?",
         type=str,
+        default=None,
         help="Caminho para o arquivo normativo (.md, .pdf) ou diretório.",
+    )
+    parser.add_argument(
+        "--path",
+        "-p",
+        dest="flag_path",
+        type=str,
+        default=None,
+        help="Caminho para o arquivo normativo (.md, .pdf) ou diretório (alternativa ao argumento posicional).",
     )
     parser.add_argument(
         "--provider",
@@ -242,8 +284,8 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=32,
-        help="Quantidade de chunks por lote na geração de embeddings (padrão: 32).",
+        default=64,
+        help="Quantidade de chunks por lote na geração de embeddings (padrão: 64).",
     )
     parser.add_argument(
         "--all",
@@ -263,7 +305,15 @@ async def main(args: list[str] | None = None) -> int:
     parser = _build_argument_parser()
     cli_args = parser.parse_args(args)
 
-    target_path = Path(cli_args.path)
+    raw_path = cli_args.flag_path or cli_args.positional_path
+    if not raw_path:
+        parser.error(
+            "O caminho do arquivo ou diretório é obrigatório. "
+            "Exemplo: uv run python -m lumi.ingestion docs/info/DIS-NOR-030-REV07.md "
+            "ou uv run python -m lumi.ingestion --path docs/info/DIS-NOR-030-REV07.md"
+        )
+
+    target_path = Path(raw_path)
     if not target_path.exists():
         print(f"Erro: Caminho especificado não existe: {target_path}", file=sys.stderr)
         return 1
@@ -273,7 +323,17 @@ async def main(args: list[str] | None = None) -> int:
         if target_path.is_dir():
             md_files = list(target_path.glob("**/*.md"))
             pdf_files = list(target_path.glob("**/*.pdf"))
-            files_to_process = sorted(md_files + pdf_files)
+            # Filtra apenas arquivos normativos (DIS-NOR) se houver múltiplos
+            all_found = sorted(md_files + pdf_files)
+            norm_files = [f for f in all_found if "DIS-NOR" in f.name.upper()]
+            # Se encontrar versões .md e .pdf da mesma norma, prioriza .md para evitar duplicação
+            seen_stems: set[str] = set()
+            for f in sorted(norm_files, key=lambda x: (x.stem, 0 if x.suffix == ".md" else 1)):
+                if f.stem not in seen_stems:
+                    seen_stems.add(f.stem)
+                    files_to_process.append(f)
+            if not files_to_process:
+                files_to_process = all_found
         else:
             files_to_process = [target_path]
     else:

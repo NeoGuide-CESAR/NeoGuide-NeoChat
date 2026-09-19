@@ -163,12 +163,13 @@ def _extract_pdf_metadata(first_page_text: str, file_name: str) -> tuple[str, st
     doc_code = code_match.group(1).upper() if code_match else "DIS-NOR-000"
 
     # Revisão
-    rev_match = re.search(r"REV\.?:\s*(\w+)", first_page_text, re.IGNORECASE)
-    if not rev_match:
-        rev_match = re.search(r"REV\s*[-_]?\s*(\d+)", file_name, re.IGNORECASE)
-        revision = f"REV{rev_match.group(1)}" if rev_match else "REV01"
+    rev_match = re.search(r"REV\.?:\s*([A-Za-z0-9º]+)", first_page_text, re.IGNORECASE)
+    candidate_rev = rev_match.group(1).strip() if rev_match else ""
+    if candidate_rev.upper() in ("Nº", "NO", "N", "PÁG", "PAG", ""):
+        file_rev = re.search(r"REV\s*[-_]?\s*(\d+)", file_name, re.IGNORECASE)
+        revision = f"REV{file_rev.group(1)}" if file_rev else "REV01"
     else:
-        revision = rev_match.group(1).strip()
+        revision = candidate_rev
 
     # Empresa
     company = "Neoenergia Pernambuco"

@@ -98,6 +98,7 @@ def get_embeddings(
                 "Chave de API do Google Gemini não configurada. Defina GEMINI_API_KEY no ambiente."
             )
         model_name = kwargs.pop("model", resolved_settings.gemini_embedding_model)
+        kwargs.setdefault("output_dimensionality", resolved_settings.embedding_dimension)
         return GoogleGenerativeAIEmbeddings(
             model=model_name,
             google_api_key=api_key,
