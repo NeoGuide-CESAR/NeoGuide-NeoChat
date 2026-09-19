@@ -150,7 +150,10 @@ Para verificar se o container está saudável (`healthy`) e operante:
 docker compose ps
 ```
 
-O container `lumi-db` executará o script de inicialização `docker/init.sql`, garantindo que a extensão `vector` seja ativada no banco `lumi_db`.
+O container `lumi-db` utiliza um *bind mount* direto na pasta física `./docker/data` do repositório para persistência completa de tabelas e índices vetoriais. Na primeira execução, executará o script de inicialização `docker/init.sql`, garantindo que a extensão `vector` seja ativada no banco `lumi_db`.
+
+> [!NOTE]
+> Os dados do PostgreSQL ficam armazenados na pasta local `./docker/data/`. O conteúdo interno é ignorado pelo Git via `.gitignore`, mantendo apenas o arquivo de rastreamento `.gitkeep`. Caso necessite resetar completamente o banco para o estado inicial, basta parar os containers (`docker compose down`), limpar o conteúdo da pasta `./docker/data/` (preservando o `.gitkeep`) e subir o serviço novamente.
 
 ---
 
@@ -439,7 +442,7 @@ uv run pre-commit run --all-files
 
 ### 2. "extension 'vector' does not exist"
 - **Causa:** O banco de dados foi inicializado a partir de uma imagem padrão do Postgres sem o pgvector compilado.
-- **Solução:** Use estritamente a imagem oficial configurada no `docker-compose.yml`: `pgvector/pgvector:pg16`. Se o volume foi criado anteriormente sem ela, resete o volume com `docker compose down -v` e recrie com `docker compose up -d lumi-db`.
+- **Solução:** Use estritamente a imagem oficial configurada no `docker-compose.yml`: `pgvector/pgvector:pg16`. Se o diretório de dados foi inicializado anteriormente sem ela, pare o container com `docker compose down`, limpe os arquivos da pasta `./docker/data/` (preservando o `.gitkeep`) e recrie com `docker compose up -d lumi-db`.
 
 ### 3. "401 Unauthorized: Invalid or missing API Key"
 - **Causa:** A requisição HTTP não incluiu o cabeçalho `X-API-Key` ou enviou uma chave diferente daquela definida na variável `API_KEY` do arquivo `.env`.

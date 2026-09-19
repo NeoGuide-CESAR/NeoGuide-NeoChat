@@ -91,8 +91,10 @@ pg_data/
 pgdata/
 
 # -----------------------------------------------------------------------------
-# Docker — volumes temporários locais
+# Docker — volumes temporários locais e bind mount do PostgreSQL
 # -----------------------------------------------------------------------------
+docker/data/*
+!docker/data/.gitkeep
 docker/volumes/
 .docker/
 docker-compose.override.yml
