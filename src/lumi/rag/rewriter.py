@@ -8,7 +8,11 @@ import structlog
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from lumi.core.config import Settings, get_settings
-from lumi.rag.llm_factory import get_llm
+from lumi.rag.llm_factory import (
+    MAX_FALLBACK_ATTEMPTS,
+    get_llm_chain,
+    get_model_name,
+)
 
 if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
@@ -32,11 +36,38 @@ class QueryRewriter:
     def __init__(
         self,
         llm: BaseChatModel | None = None,
+        fallback_llms: list[BaseChatModel] | None = None,
         settings: Settings | None = None,
     ) -> None:
         """Inicializa o reescritor com modelo de linguagem e configurações do sistema."""
         self.settings = settings or get_settings()
-        self.llm = llm or get_llm(settings=self.settings)
+        self._llm = llm
+        self._fallback_llms = fallback_llms
+        self._models: list[BaseChatModel] | None = None
+
+    @property
+    def models(self) -> list[BaseChatModel]:
+        """Obtém ou inicializa tardiamente a cadeia ordenada de modelos para reescrita."""
+        if self._models is None:
+            if self._llm is not None:
+                chain = [self._llm]
+                if self._fallback_llms:
+                    chain.extend(self._fallback_llms)
+                self._models = chain
+            else:
+                self._models = get_llm_chain(settings=self.settings)
+        return self._models
+
+    @property
+    def llm(self) -> BaseChatModel:
+        """Obtém o modelo primário configurado."""
+        return self.models[0]
+
+    @llm.setter
+    def llm(self, value: BaseChatModel) -> None:
+        """Define o modelo primário configurado."""
+        self._llm = value
+        self._models = None
 
     async def rewrite(
         self,
@@ -83,31 +114,52 @@ class QueryRewriter:
             HumanMessage(content=f"Pergunta a reformular: {stripped_query}"),
         ]
 
-        try:
-            response = await self.llm.ainvoke(messages)
-            content = str(response.content).strip()
-            # Limpa aspas ou delimitadores que a LLM possa gerar
-            cleaned_query = content.strip("\"'").strip()
+        models = self.models
+        max_attempts = min(len(models), MAX_FALLBACK_ATTEMPTS)
 
-            if not cleaned_query:
-                logger.warning(
-                    "query_rewriter_empty_response_fallback",
+        for attempt_idx in range(max_attempts):
+            attempt = attempt_idx + 1
+            current_model = models[attempt_idx]
+            current_model_name = get_model_name(current_model)
+
+            try:
+                response = await current_model.ainvoke(messages)
+                content = str(response.content).strip()
+                # Limpa aspas ou delimitadores que a LLM possa gerar
+                cleaned_query = content.strip("\"'").strip()
+
+                if not cleaned_query:
+                    logger.warning(
+                        "query_rewriter_empty_response_fallback",
+                        original_query=stripped_query,
+                    )
+                    return stripped_query
+
+                logger.info(
+                    "query_rewriter_success",
                     original_query=stripped_query,
+                    rewritten_query=cleaned_query,
+                )
+                return cleaned_query
+
+            except Exception as exc:
+                if attempt < max_attempts:
+                    next_model_name = get_model_name(models[attempt_idx + 1])
+                    logger.warning(
+                        "llm_fallback_attempt",
+                        failed_model=current_model_name,
+                        next_model=next_model_name,
+                        attempt=attempt,
+                        error=str(exc),
+                    )
+                    continue
+
+                logger.warning(
+                    "query_rewriter_fallback_on_error",
+                    query=stripped_query,
+                    error=str(exc),
+                    exc_info=True,
                 )
                 return stripped_query
 
-            logger.info(
-                "query_rewriter_success",
-                original_query=stripped_query,
-                rewritten_query=cleaned_query,
-            )
-            return cleaned_query
-
-        except Exception as exc:
-            logger.warning(
-                "query_rewriter_fallback_on_error",
-                query=stripped_query,
-                error=str(exc),
-                exc_info=True,
-            )
-            return stripped_query
+        return stripped_query

@@ -14,6 +14,26 @@ from lumi.core.config import Settings, get_settings
 SUPPORTED_LLM_PROVIDERS: tuple[str, ...] = ("gemini", "claude", "anthropic")
 SUPPORTED_EMBEDDING_PROVIDERS: tuple[str, ...] = ("gemini", "fake")
 
+DEFAULT_GEMINI_PRIMARY_MODEL: str = "gemini-3.8-flash"
+DEFAULT_GEMINI_FALLBACK_MODELS: tuple[str, ...] = ("gemini-3.7-flash", "gemini-3.6-flash")
+MAX_FALLBACK_ATTEMPTS: int = 3
+
+
+def get_model_name(model: Any) -> str:
+    """Extrai o nome ou identificador de modelo de uma instância de chat model ou mock.
+
+    Args:
+        model: Objeto do modelo (BaseChatModel ou mock com atributo model, model_name ou name).
+
+    Returns:
+        str: Identificador do modelo ou "unknown_model".
+    """
+    for attr in ("model", "model_name", "name"):
+        val = getattr(model, attr, None)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return "unknown_model"
+
 
 def get_llm(
     provider: str | None = None,
@@ -67,6 +87,47 @@ def get_llm(
         f"Provedor de LLM '{selected_provider}' não suportado. "
         f"Provedores válidos: {', '.join(repr(p) for p in SUPPORTED_LLM_PROVIDERS)}."
     )
+
+
+def get_llm_chain(
+    provider: str | None = None,
+    settings: Settings | None = None,
+    **kwargs: Any,
+) -> list[BaseChatModel]:
+    """Retorna uma cadeia ordenada de instâncias de LLM (primário e fallbacks) para o provedor.
+
+    Para o provedor Gemini, instancia sequencialmente o modelo primário e os modelos de fallback
+    configurados até o limite estrito de MAX_FALLBACK_ATTEMPTS (3).
+
+    Args:
+        provider: Nome do provedor ("gemini", "claude" ou "anthropic").
+        settings: Objeto de configurações do sistema (opcional).
+        **kwargs: Parâmetros repassados ao construtor de cada modelo (ex.: temperature).
+
+    Returns:
+        list[BaseChatModel]: Lista contendo o modelo primário e modelos de fallback.
+    """
+    resolved_settings = settings or get_settings()
+    selected_provider = (provider or resolved_settings.default_llm_provider).strip().lower()
+
+    if selected_provider == "gemini":
+        model_names: list[str] = [resolved_settings.gemini_model]
+        for fb in getattr(resolved_settings, "gemini_fallback_models", []):
+            if fb not in model_names:
+                model_names.append(fb)
+
+        # Limite estrito de MAX_FALLBACK_ATTEMPTS (3)
+        model_names = model_names[:MAX_FALLBACK_ATTEMPTS]
+
+        chain: list[BaseChatModel] = []
+        for m_name in model_names:
+            model_kwargs = dict(kwargs)
+            model_kwargs["model"] = m_name
+            chain.append(get_llm(provider="gemini", settings=resolved_settings, **model_kwargs))
+        return chain
+
+    # Para outros provedores, retorna lista com o modelo principal configurado
+    return [get_llm(provider=selected_provider, settings=resolved_settings, **kwargs)]
 
 
 def get_embeddings(
@@ -154,9 +215,14 @@ def validate_embedding_dimension(
 
 
 __all__ = [
+    "DEFAULT_GEMINI_FALLBACK_MODELS",
+    "DEFAULT_GEMINI_PRIMARY_MODEL",
+    "MAX_FALLBACK_ATTEMPTS",
     "SUPPORTED_EMBEDDING_PROVIDERS",
     "SUPPORTED_LLM_PROVIDERS",
     "get_embeddings",
     "get_llm",
+    "get_llm_chain",
+    "get_model_name",
     "validate_embedding_dimension",
 ]

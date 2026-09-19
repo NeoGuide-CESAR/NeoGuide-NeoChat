@@ -15,7 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lumi.core.config import Settings, get_settings
 from lumi.rag.chains import RagContextOrchestrator
 from lumi.rag.guardrails import validate_input
-from lumi.rag.llm_factory import get_llm
+from lumi.rag.llm_factory import (
+    MAX_FALLBACK_ATTEMPTS,
+    get_llm_chain,
+    get_model_name,
+)
 from lumi.rag.prompts import CONTINGENCY_NO_SOURCES_MESSAGE, get_rag_prompt_template
 from lumi.rag.reranker import NormativeReranker
 from lumi.rag.retriever import NormativeRetriever
@@ -43,11 +47,14 @@ def create_rag_orchestrator(
     session: AsyncSession,
     settings: Settings,
     llm: BaseChatModel,
+    fallback_llms: list[BaseChatModel] | None = None,
 ) -> RagContextOrchestrator:
     """Cria a instância padrão de RagContextOrchestrator com retriever, rewriter e reranker."""
     retriever = NormativeRetriever(session=session, settings=settings)
     rewriter = (
-        QueryRewriter(llm=llm, settings=settings) if settings.query_rewriter_enabled else None
+        QueryRewriter(llm=llm, fallback_llms=fallback_llms, settings=settings)
+        if settings.query_rewriter_enabled
+        else None
     )
     reranker = NormativeReranker(llm=llm, settings=settings) if settings.reranker_enabled else None
     return RagContextOrchestrator(
@@ -64,6 +71,7 @@ class ChatService:
         self,
         session: AsyncSession,
         llm: BaseChatModel | None = None,
+        fallback_llms: list[BaseChatModel] | None = None,
         rag_orchestrator: RagContextOrchestrator | None = None,
         session_service: SessionService | None = None,
         settings: Settings | None = None,
@@ -73,6 +81,8 @@ class ChatService:
         self.session = session
         self.settings = settings or get_settings()
         self._llm = llm
+        self._fallback_llms = fallback_llms
+        self._models: list[BaseChatModel] | None = None
         self._rag_orchestrator = rag_orchestrator
         self.session_service = session_service or SessionService(
             session=self.session,
@@ -83,11 +93,22 @@ class ChatService:
         )
 
     @property
+    def models(self) -> list[BaseChatModel]:
+        """Obtém ou inicializa tardiamente a cadeia ordenada de modelos (primário e fallbacks)."""
+        if self._models is None:
+            if self._llm is not None:
+                chain = [self._llm]
+                if self._fallback_llms:
+                    chain.extend(self._fallback_llms)
+                self._models = chain
+            else:
+                self._models = get_llm_chain(temperature=0.0, settings=self.settings)
+        return self._models
+
+    @property
     def llm(self) -> BaseChatModel:
-        """Obtém ou inicializa tardiamente o modelo LLM configurado com temperatura determinística."""
-        if self._llm is None:
-            self._llm = get_llm(temperature=0.0, settings=self.settings)
-        return self._llm
+        """Obtém ou inicializa tardiamente o modelo LLM primário configurado."""
+        return self.models[0]
 
     @property
     def rag_orchestrator(self) -> RagContextOrchestrator:
@@ -97,6 +118,7 @@ class ChatService:
                 session=self.session,
                 settings=self.settings,
                 llm=self.llm,
+                fallback_llms=self.models[1:] if len(self.models) > 1 else None,
             )
         return self._rag_orchestrator
 
@@ -244,54 +266,95 @@ class ChatService:
         )
 
         full_response = ""
-        try:
-            async for chunk in self.llm.astream(prompt_messages):
-                content = chunk.content if hasattr(chunk, "content") else str(chunk)
-                if isinstance(content, list):
-                    token_str = "".join(
-                        str(b.get("text", b) if isinstance(b, dict) else b) for b in content
+        stream_started = False
+        models = self.models
+        max_attempts = min(len(models), MAX_FALLBACK_ATTEMPTS)
+
+        for attempt_idx in range(max_attempts):
+            attempt = attempt_idx + 1
+            current_model = models[attempt_idx]
+            current_model_name = get_model_name(current_model)
+
+            try:
+                async for chunk in current_model.astream(prompt_messages):
+                    content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                    if isinstance(content, list):
+                        token_str = "".join(
+                            str(b.get("text", b) if isinstance(b, dict) else b) for b in content
+                        )
+                    else:
+                        token_str = str(content)
+
+                    if token_str:
+                        stream_started = True
+                        full_response += token_str
+                        yield self._format_sse("token", StreamTokenEvent(token=token_str))
+
+                yield self._format_sse("sources", StreamSourcesEvent(sources=rag_result.sources))
+                yield self._format_sse("done", StreamDoneEvent(session_id=request.session_id))
+
+                # Despacho em background pós-evento done
+                latency_ms = int((time.perf_counter() - start_time) * 1000)
+                top_doc = rag_result.sources[0].document_code if rag_result.sources else None
+                top_score = rag_result.sources[0].relevance_score if rag_result.sources else None
+                asyncio.create_task(
+                    self.persist_interaction_fn(
+                        session_id=request.session_id,
+                        query_text=guard_result.sanitized_text,
+                        assistant_message=full_response,
+                        sources=[s.model_dump() for s in rag_result.sources],
+                        top_document_code=top_doc,
+                        top_similarity_score=top_score,
+                        latency_ms=latency_ms,
+                        retrieved_chunks=rag_result.chunks,
                     )
-                else:
-                    token_str = str(content)
-
-                if token_str:
-                    full_response += token_str
-                    yield self._format_sse("token", StreamTokenEvent(token=token_str))
-
-            yield self._format_sse("sources", StreamSourcesEvent(sources=rag_result.sources))
-            yield self._format_sse("done", StreamDoneEvent(session_id=request.session_id))
-
-            # Despacho em background pós-evento done
-            latency_ms = int((time.perf_counter() - start_time) * 1000)
-            top_doc = rag_result.sources[0].document_code if rag_result.sources else None
-            top_score = rag_result.sources[0].relevance_score if rag_result.sources else None
-            asyncio.create_task(
-                self.persist_interaction_fn(
-                    session_id=request.session_id,
-                    query_text=guard_result.sanitized_text,
-                    assistant_message=full_response,
-                    sources=[s.model_dump() for s in rag_result.sources],
-                    top_document_code=top_doc,
-                    top_similarity_score=top_score,
-                    latency_ms=latency_ms,
-                    retrieved_chunks=rag_result.chunks,
                 )
-            )
+                return
 
-        except Exception as exc:
-            logger.error(
-                "chat_service_llm_stream_error",
-                session_id=str(request.session_id),
-                error=str(exc),
-                exc_info=True,
-            )
-            yield self._format_sse(
-                "error",
-                StreamErrorEvent(
-                    error="Falha durante a geração da resposta pelo assistente.",
-                    code="LLM_STREAM_ERROR",
-                ),
-            )
+            except Exception as exc:
+                # Se já começou a transmitir tokens ao cliente, não reinicia em outro modelo
+                if stream_started:
+                    logger.error(
+                        "chat_service_llm_stream_error",
+                        session_id=str(request.session_id),
+                        error=str(exc),
+                        exc_info=True,
+                    )
+                    yield self._format_sse(
+                        "error",
+                        StreamErrorEvent(
+                            error="Falha durante a geração da resposta pelo assistente.",
+                            code="LLM_STREAM_ERROR",
+                        ),
+                    )
+                    return
+
+                # Se ainda não emitiu tokens e existem modelos subsequentes
+                if attempt < max_attempts:
+                    next_model_name = get_model_name(models[attempt_idx + 1])
+                    logger.warning(
+                        "llm_fallback_attempt",
+                        failed_model=current_model_name,
+                        next_model=next_model_name,
+                        attempt=attempt,
+                        error=str(exc),
+                    )
+                    continue
+
+                # Todas as tentativas da cadeia falharam antes do início da transmissão
+                logger.error(
+                    "chat_service_llm_stream_error",
+                    session_id=str(request.session_id),
+                    error=str(exc),
+                    exc_info=True,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=(
+                        "O modelo de inteligência artificial está temporariamente sobrecarregado "
+                        "(HTTP 503 do provedor). Por favor, tente novamente em alguns segundos."
+                    ),
+                ) from exc
 
     async def process_chat(
         self,
@@ -386,31 +449,53 @@ class ChatService:
             question=guard_result.sanitized_text,
         )
 
-        try:
-            llm_response = await self.llm.ainvoke(prompt_messages)
-            response_content = (
-                llm_response.content if hasattr(llm_response, "content") else str(llm_response)
-            )
-            if isinstance(response_content, list):
-                response_text = "".join(
-                    str(b.get("text", b) if isinstance(b, dict) else b) for b in response_content
+        response_text = ""
+        models = self.models
+        max_attempts = min(len(models), MAX_FALLBACK_ATTEMPTS)
+
+        for attempt_idx in range(max_attempts):
+            attempt = attempt_idx + 1
+            current_model = models[attempt_idx]
+            current_model_name = get_model_name(current_model)
+
+            try:
+                llm_response = await current_model.ainvoke(prompt_messages)
+                response_content = (
+                    llm_response.content if hasattr(llm_response, "content") else str(llm_response)
                 )
-            else:
-                response_text = str(response_content)
-        except Exception as exc:
-            logger.error(
-                "chat_service_llm_invoke_error",
-                session_id=str(request.session_id),
-                error=str(exc),
-                exc_info=True,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=(
-                    "O modelo de inteligência artificial está temporariamente sobrecarregado "
-                    "(HTTP 503 do provedor). Por favor, tente novamente em alguns segundos."
-                ),
-            ) from exc
+                if isinstance(response_content, list):
+                    response_text = "".join(
+                        str(b.get("text", b) if isinstance(b, dict) else b)
+                        for b in response_content
+                    )
+                else:
+                    response_text = str(response_content)
+                break
+            except Exception as exc:
+                if attempt < max_attempts:
+                    next_model_name = get_model_name(models[attempt_idx + 1])
+                    logger.warning(
+                        "llm_fallback_attempt",
+                        failed_model=current_model_name,
+                        next_model=next_model_name,
+                        attempt=attempt,
+                        error=str(exc),
+                    )
+                    continue
+
+                logger.error(
+                    "chat_service_llm_invoke_error",
+                    session_id=str(request.session_id),
+                    error=str(exc),
+                    exc_info=True,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=(
+                        "O modelo de inteligência artificial está temporariamente sobrecarregado "
+                        "(HTTP 503 do provedor). Por favor, tente novamente em alguns segundos."
+                    ),
+                ) from exc
 
         latency_ms = int((time.perf_counter() - start_time) * 1000)
         top_doc = rag_result.sources[0].document_code if rag_result.sources else None
