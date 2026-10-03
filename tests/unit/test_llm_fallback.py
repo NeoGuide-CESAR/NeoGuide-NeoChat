@@ -93,9 +93,10 @@ class TestConfigAndFactoryDefaults:
 
     def test_default_settings_models(self) -> None:
         """Valida se as configurações possuem os modelos e fallbacks padrão especificados."""
-        settings = Settings()
+        settings = Settings(_env_file=None)
         assert settings.gemini_model == "gemini-3.8-flash"
         assert settings.gemini_fallback_models == ["gemini-3.7-flash", "gemini-3.6-flash"]
+
 
     def test_factory_constants(self) -> None:
         """Valida constantes padrão na fábrica de LLMs."""
