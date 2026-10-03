@@ -93,11 +93,11 @@ pgdata/
 # -----------------------------------------------------------------------------
 # Docker — volumes temporários locais e bind mount do PostgreSQL
 # -----------------------------------------------------------------------------
-docker/data/*
-!docker/data/.gitkeep
+docker/data/postmaster.pid
 docker/volumes/
 .docker/
 docker-compose.override.yml
+
 
 # -----------------------------------------------------------------------------
 # pre-commit — cache de hooks
