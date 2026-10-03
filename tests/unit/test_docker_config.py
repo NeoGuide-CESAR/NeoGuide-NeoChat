@@ -35,7 +35,7 @@ def test_docker_compose_exists_and_valid() -> None:
     assert "pgvector/pgvector:pg16" in content
     assert "lumi-api:" in content
     assert "condition: service_healthy" in content
-    assert "lumi_pgdata:" in content
+    assert "./docker/data:/var/lib/postgresql/data" in content
 
 
 def test_dockerignore_exists() -> None:

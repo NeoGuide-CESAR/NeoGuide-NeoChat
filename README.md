@@ -8,7 +8,7 @@ Desenvolvido para engenheiros de campo, projetistas e técnicos de infraestrutur
 - **Linguagem & Runtime:** Python 3.12+ gerenciado por `uv`
 - **Framework Web:** FastAPI (com streaming Server-Sent Events e endpoints síncronos)
 - **Framework de IA:** LangChain (com Google Gemini como provedor primário e Anthropic Claude como fallback)
-- **Persistência & Vetores:** PostgreSQL 16 + pgvector (orquestrado via Docker Compose)
+- **Persistência & Vetores:** PostgreSQL 16 + pgvector (orquestrado via Docker Compose com bind mount em `./docker/data`)
 - **Validação & Contratos:** Pydantic v2 & Pydantic Settings
 - **Logs Estruturados:** structlog (JSON)
 - **Qualidade & Segurança:** pre-commit hooks, Ruff, Mypy e detect-secrets
@@ -27,7 +27,7 @@ cp .env.example .env
 
 ### 3. Banco de Dados, Migrações e Ingestão de Normas
 ```bash
-# Iniciar o PostgreSQL 16 com pgvector
+# Iniciar o PostgreSQL 16 com pgvector (dados persistidos localmente em ./docker/data)
 docker compose up -d lumi-db
 
 # Sincronizar dependências com uv (incluindo testes e linters)
