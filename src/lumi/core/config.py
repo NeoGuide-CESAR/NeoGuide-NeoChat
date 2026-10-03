@@ -44,7 +44,11 @@ class Settings(BaseSettings):
         default="gemini", description="Provedor padrão de embeddings (gemini ou fake)"
     )
     gemini_api_key: str = Field(default="", description="Chave de API do Google Gemini")
-    gemini_model: str = Field(default="gemini-1.5-pro", description="Modelo LLM padrão")
+    gemini_model: str = Field(default="gemini-3.8-flash", description="Modelo LLM padrão")
+    gemini_fallback_models: list[str] = Field(
+        default=["gemini-3.7-flash", "gemini-3.6-flash"],
+        description="Lista ordenada de modelos de fallback do Google Gemini",
+    )
     gemini_embedding_model: str = Field(
         default="text-embedding-004", description="Modelo de embedding vetorial"
     )

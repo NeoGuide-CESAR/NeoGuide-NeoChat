@@ -9,10 +9,15 @@ from lumi.rag.guardrails import (
     validate_input,
 )
 from lumi.rag.llm_factory import (
+    DEFAULT_GEMINI_FALLBACK_MODELS,
+    DEFAULT_GEMINI_PRIMARY_MODEL,
+    MAX_FALLBACK_ATTEMPTS,
     SUPPORTED_EMBEDDING_PROVIDERS,
     SUPPORTED_LLM_PROVIDERS,
     get_embeddings,
     get_llm,
+    get_llm_chain,
+    get_model_name,
     validate_embedding_dimension,
 )
 from lumi.rag.output_guardrails import (
@@ -39,8 +44,11 @@ from lumi.rag.rewriter import QueryRewriter
 __all__ = [
     "CONTINGENCY_NO_SOURCES_MESSAGE",
     "CONTINGENCY_NO_SOURCES_PROMPT",
+    "DEFAULT_GEMINI_FALLBACK_MODELS",
+    "DEFAULT_GEMINI_PRIMARY_MODEL",
     "GuardrailResult",
     "LUMI_SYSTEM_PROMPT",
+    "MAX_FALLBACK_ATTEMPTS",
     "NormativeReranker",
     "NormativeRetriever",
     "OutputGuardrailResult",
@@ -57,6 +65,8 @@ __all__ = [
     "get_chat_prompt_template",
     "get_embeddings",
     "get_llm",
+    "get_llm_chain",
+    "get_model_name",
     "get_rag_prompt_template",
     "sanitize_pii",
     "validate_embedding_dimension",
