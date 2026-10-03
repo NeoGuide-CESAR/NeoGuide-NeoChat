@@ -218,20 +218,46 @@ O sistema DEVE fornecer a função assíncrona `ingest_normative_file` e utilit�
 #### Scenario: Rate limiting defensivo e retentativas exponenciais
 - **GIVEN** um conjunto de textos normativos e um provedor de embeddings sujeito a falhas transitórias de conexão ou limite de requisições (429)
 - **WHEN** a geração em lote for acionada
-- **THEN** o sistema deve processar em lotes (`batch_size=32`), aguardar delay defensivo entre lotes (0.2s) e executar até 3 tentativas com backoff exponencial (1s, 2s, 4s) antes de considerar o lote com falha.
+- **THEN** o sistema deve processar em lotes (`batch_size=64`), aguardar delay defensivo entre lotes e executar até 3 tentativas com backoff adaptativo extraindo o tempo de espera da resposta (`_extract_retry_delay`) antes de considerar o lote com falha.
+
+#### Scenario: Detecção de cota Google Gemini com pausa adaptativa
+- **GIVEN** um erro de cota `ResourceExhausted` ou HTTP 429 durante a vetorização de um lote
+- **WHEN** o pipeline capturar a exceção
+- **THEN** o sistema deve calcular o tempo de espera recomendado, exibir mensagem clara no terminal (`[RATE LIMIT]`) e pausar a execução assincronamente sem derrubar a rotina de ingestão.
+
+---
+
+### Requirement: Desduplicação e Priorização de Formatos na Ingestão por Diretório
+Ao escanear um diretório com a opção `--all` ou indicando uma pasta, caso coexistam arquivos normativos com o mesmo radical (`stem`) nos formatos `.md` e `.pdf`, o pipeline DEVE priorizar o arquivo `.md` e descartar o `.pdf` correspondente da fila de processamento, evitando duplicidade de vetores no banco de dados.
+
+#### Scenario: Coexistência de norma em Markdown e PDF na mesma pasta
+- **GIVEN** uma pasta contendo `DIS-NOR-030-REV07.md` e `DIS-NOR-030-REV07.pdf`
+- **WHEN** o pipeline de ingestão listar os arquivos normativos a processar
+- **THEN** apenas a versão `DIS-NOR-030-REV07.md` deve ser enfileirada para parser e vetorização.
 
 ---
 
 ### Requirement: Ponto de Entrada CLI para Ingestão Normativa
-O sistema DEVE fornecer um ponto de entrada executável de linha de comando (`python -m lumi.ingestion.pipeline`) permitindo que operadores processem normas técnicas individuais ou varram diretórios completos em lote.
+O sistema DEVE fornecer um ponto de entrada executável de linha de comando (`python -m lumi.ingestion.pipeline`) permitindo que operadores processem normas técnicas individuais ou varram diretórios completos em lote, aceitando caminhos como argumentos posicionais ou via flags `--path / -p`.
 
-#### Scenario: Execução de arquivo individual via CLI
-- **GIVEN** o comando `python -m lumi.ingestion.pipeline docs/info/DIS-NOR-030-REV07.md --provider fake`
+#### Scenario: Execução de arquivo individual via CLI com flag ou argumento posicional
+- **GIVEN** o comando `python -m lumi.ingestion.pipeline docs/info/DIS-NOR-030-REV07.md` ou `python -m lumi.ingestion.pipeline --path docs/info/DIS-NOR-030-REV07.md`
 - **WHEN** o processo for executado
 - **THEN** o arquivo deve ser processado e um sumário com documento, revisão, total de chunks e tempo de ingestão deve ser impresso no console.
 
 #### Scenario: Execução recursiva de diretório com a flag --all
 - **GIVEN** um diretório contendo arquivos `.md` e `.pdf` e o comando com `--all`
 - **WHEN** o CLI for executado
-- **THEN** todos os arquivos normativos suportados dentro do diretório devem ser descobertos e ingeridos sequencialmente, apresentando um relatório consolidado.
+- **THEN** todos os arquivos normativos suportados dentro do diretório devem ser descobertos, desduplicados e ingeridos sequencialmente, apresentando um relatório consolidado.
+
+---
+
+### Requirement: Extração Robusta de Metadados de PDF e Heurística de Revisão
+O parser de PDF DEVE extrair a numeração de revisão normativa com filtro defensivo contra falsos positivos originados da diagramação ou OCR (como termos `"Nº"`, `"NO"`, `"PÁG"`).
+
+#### Scenario: Rejeição de tokens inválidos na revisão normativa de PDF
+- **GIVEN** um documento PDF cuja primeira página apresente marcações de layout capturadas como revisão (ex.: `"Nº"`, `"NO"`, `"PÁG"`)
+- **WHEN** a extração de metadados for executada
+- **THEN** o parser deve ignorar esses termos espúrios e recuperar a revisão a partir do nome do arquivo (ex.: `REV07`) ou fallback seguro `REV01`.
+
 
