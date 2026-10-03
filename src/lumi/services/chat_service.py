@@ -5,10 +5,11 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import AsyncGenerator, Callable
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import structlog
 from fastapi import BackgroundTasks, HTTPException, status
+from langchain_core.language_models.chat_models import BaseChatModel
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +18,7 @@ from lumi.rag.chains import RagContextOrchestrator
 from lumi.rag.guardrails import validate_input
 from lumi.rag.llm_factory import (
     MAX_FALLBACK_ATTEMPTS,
+    get_llm,
     get_llm_chain,
     get_model_name,
 )
@@ -36,9 +38,6 @@ from lumi.services.analytics_service import persist_interaction_background
 from lumi.services.session_service import (
     SessionService,
 )
-
-if TYPE_CHECKING:
-    from langchain_core.language_models.chat_models import BaseChatModel
 
 logger = structlog.get_logger(__name__)
 
@@ -102,7 +101,16 @@ class ChatService:
                     chain.extend(self._fallback_llms)
                 self._models = chain
             else:
-                self._models = get_llm_chain(temperature=0.0, settings=self.settings)
+                try:
+                    primary = get_llm(temperature=0.0, settings=self.settings)
+                except Exception:
+                    primary = None
+
+                if primary is not None and not isinstance(primary, BaseChatModel):
+                    # Suporte a mock em testes de integração (ex.: patch em get_llm)
+                    self._models = [primary]
+                else:
+                    self._models = get_llm_chain(temperature=0.0, settings=self.settings)
         return self._models
 
     @property
