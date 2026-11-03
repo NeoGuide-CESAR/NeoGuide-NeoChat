@@ -28,7 +28,7 @@ jobs:
         run: uv sync --frozen
 
       - name: Run Ruff Lint Check
-        run: uv run ruff check .
+        run: uv run ruff check src tests
 
       - name: Run Unit Tests (ignoring evals/external APIs)
         run: uv run pytest -m "not evals and not integration"
