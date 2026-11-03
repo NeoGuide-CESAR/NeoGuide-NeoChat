@@ -24,8 +24,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: uv sync --frozen
+      - name: Install dependencies (including dev tools)
+        run: uv sync --frozen --extra dev
 
       - name: Run Ruff Lint Check
         run: uv run ruff check src tests
