@@ -1,0 +1,76 @@
+name: Deploy NeoChat to VPS
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Permite disparar o deploy manualmente pela aba Actions do GitHub
+
+jobs:
+  test:
+    name: Run Python Tests & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run Ruff Lint Check
+        run: uv run ruff check .
+
+      - name: Run Unit Tests (ignoring evals/external APIs)
+        run: uv run pytest -m "not evals and not integration"
+        env:
+          ENVIRONMENT: test
+          API_KEY: test-key-ci
+          GEMINI_API_KEY: test-gemini-key
+
+  deploy:
+    name: Deploy to VPS
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+
+            # Localiza o diretório do projeto na VPS
+            if [ -d "$HOME/neoguide-neochat" ]; then
+              cd "$HOME/neoguide-neochat"
+            elif [ -d "$HOME/NeoGuide-NeoChat" ]; then
+              cd "$HOME/NeoGuide-NeoChat"
+            else
+              echo "Erro: Diretório do NeoChat não encontrado na home do usuário!"
+              exit 1
+            fi
+
+            echo "=== Atualizando repositório na VPS ==="
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "=== Subindo containers NeoChat com Docker Compose ==="
+            docker compose down
+            docker compose up -d --build --remove-orphans
+
+            echo "=== Limpando imagens antigas sem uso ==="
+            docker image prune -f
+
+            echo "=== Deploy do NeoChat finalizado com sucesso! ==="

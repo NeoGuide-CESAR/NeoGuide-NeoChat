@@ -1,5 +1,5 @@
 # =============================================================================
-# Lumi (NeoGuide) — Orquestração Local de Desenvolvimento com Docker Compose
+# Lumi (NeoGuide) — Orquestração de Containers Docker Compose
 # Serviços: lumi-api (FastAPI + uv) e lumi-db (PostgreSQL 16 + pgvector)
 # =============================================================================
 
@@ -9,16 +9,17 @@ services:
     container_name: lumi-db
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      # Mapeia na porta 5433 do host para NUNCA conflitar com o PostgreSQL do NeoGuide-Back (5432)
+      - "127.0.0.1:5433:5432"
     environment:
-      POSTGRES_DB: lumi_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-lumi_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - ./docker/data:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d lumi_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-lumi_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -37,13 +38,9 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@lumi-db:5432/lumi_db
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@lumi-db:5432/${POSTGRES_DB:-lumi_db}
       API_HOST: 0.0.0.0
       API_PORT: 8000
-      ENVIRONMENT: development
-      DEBUG: "true"
-    volumes:
-      - ./src:/app/src:ro
     depends_on:
       lumi-db:
         condition: service_healthy
