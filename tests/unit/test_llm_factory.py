@@ -7,7 +7,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmb
 
 from lumi.core.config import Settings
 from lumi.rag.llm_factory import (
+    extract_text_content,
     get_embeddings,
+    get_fast_llm,
+    get_fast_llm_chain,
     get_llm,
     validate_embedding_dimension,
 )
@@ -148,3 +151,116 @@ def test_validate_embedding_dimension(mock_settings: Settings) -> None:
         ValueError, match="Dimensão de embedding inválida: esperada 768, obtida 512"
     ):
         validate_embedding_dimension(invalid_vector, expected_dimension=768)
+
+
+def test_settings_fast_model_and_thinking_defaults() -> None:
+    """Valida defaults de modelo rápido, thinking_level, max_retries e timeout em Settings."""
+    settings = Settings(_env_file=None)
+    assert settings.gemini_fast_model == "gemini-3.5-flash-lite"
+    assert settings.gemini_thinking_level == "low"
+    assert settings.gemini_fast_thinking_level is None
+    assert settings.gemini_max_retries == 1
+    assert settings.gemini_timeout == 60.0
+
+
+def test_get_llm_applies_fail_fast_retry_and_timeout_for_fallback() -> None:
+    """Garante max_retries=1 e timeout=60.0 no Gemini para acionar fallback rapidamente em 503."""
+    settings = Settings(_env_file=None, gemini_api_key="mock-gemini-api-key")
+    llm = get_llm(provider="gemini", settings=settings)
+    assert isinstance(llm, ChatGoogleGenerativeAI)
+    assert llm.max_retries == 1
+    assert llm.timeout == 60.0
+
+    # Override explícito via kwargs deve prevalecer
+    llm_custom = get_llm(provider="gemini", settings=settings, max_retries=3, timeout=90.0)
+    assert llm_custom.max_retries == 3
+    assert llm_custom.timeout == 90.0
+
+
+def test_get_llm_applies_thinking_level_only_on_gemini_3_plus() -> None:
+    """Aplica thinking_level apenas para família Gemini 3+, preservando modelos legados."""
+    settings_v3 = Settings(
+        _env_file=None,
+        gemini_api_key="mock-gemini-api-key",
+        gemini_model="gemini-3.8-flash",
+        gemini_thinking_level="low",
+    )
+    llm_v3 = get_llm(provider="gemini", settings=settings_v3)
+    assert isinstance(llm_v3, ChatGoogleGenerativeAI)
+    assert llm_v3.model == "gemini-3.8-flash"
+    assert llm_v3.reasoning_effort == "low"
+
+    # Override explícito via kwargs deve prevalecer
+    llm_v3_high = get_llm(provider="gemini", settings=settings_v3, thinking_level="high")
+    assert llm_v3_high.reasoning_effort == "high"
+
+    # Modelo legado Gemini 1.5 não deve receber thinking_level
+    settings_v1 = Settings(
+        _env_file=None,
+        gemini_api_key="mock-gemini-api-key",
+        gemini_model="gemini-1.5-pro",
+        gemini_thinking_level="low",
+    )
+    llm_v1 = get_llm(provider="gemini", settings=settings_v1)
+    assert llm_v1.model == "gemini-1.5-pro"
+    assert llm_v1.reasoning_effort is None
+
+
+def test_get_fast_llm_and_chain_gemini() -> None:
+    """Valida get_fast_llm e get_fast_llm_chain usando gemini-3.5-flash-lite e fast thinking."""
+    settings = Settings(
+        _env_file=None,
+        gemini_api_key="mock-gemini-api-key",
+        anthropic_api_key="mock-anthropic-api-key",
+    )
+    fast_llm = get_fast_llm(provider="gemini", settings=settings)
+    assert isinstance(fast_llm, ChatGoogleGenerativeAI)
+    assert fast_llm.model == "gemini-3.5-flash-lite"
+    assert fast_llm.reasoning_effort is None
+
+    settings_with_fast_thinking = Settings(
+        _env_file=None,
+        gemini_api_key="mock-gemini-api-key",
+        gemini_fast_thinking_level="minimal",
+    )
+    fast_llm_min = get_fast_llm(provider="gemini", settings=settings_with_fast_thinking)
+    assert fast_llm_min.reasoning_effort == "minimal"
+
+    fast_chain = get_fast_llm_chain(provider="gemini", settings=settings)
+    assert [m.model for m in fast_chain] == [
+        "gemini-3.5-flash-lite",
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+    ]
+
+    # Claude mantém o comportamento padrão
+    fast_claude = get_fast_llm(provider="claude", settings=settings)
+    assert isinstance(fast_claude, ChatAnthropic)
+    assert fast_claude.model == settings.anthropic_model
+
+
+def test_extract_text_content_edge_cases() -> None:
+    """Valida extração de texto em strings, None e blocos estruturados Gemini 3+."""
+    assert extract_text_content(None) == ""
+    assert extract_text_content("Resposta simples") == "Resposta simples"
+    assert extract_text_content(42) == "42"
+
+    # Lista com bloco text + signature extras
+    blocks_with_signature = [
+        {
+            "type": "text",
+            "text": "[2, 0, 1]",
+            "extras": {"signature": "sig-abc-123"},
+        }
+    ]
+    assert extract_text_content(blocks_with_signature) == "[2, 0, 1]"
+
+    # Lista com bloco thinking + reasoning + text + string solta
+    mixed_blocks = [
+        {"type": "thinking", "thinking": "Analisando [9, 9] internamente..."},
+        {"type": "reasoning", "text": "Raciocínio oculto que não deve vazar"},
+        {"type": "text", "text": "Conforme a norma "},
+        "DIS-NOR-030",
+        {"text": ", o limite é 5%."},
+    ]
+    assert extract_text_content(mixed_blocks) == "Conforme a norma DIS-NOR-030, o limite é 5%."

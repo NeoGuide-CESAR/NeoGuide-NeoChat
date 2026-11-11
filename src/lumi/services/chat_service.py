@@ -18,6 +18,7 @@ from lumi.rag.chains import RagContextOrchestrator
 from lumi.rag.guardrails import validate_input
 from lumi.rag.llm_factory import (
     MAX_FALLBACK_ATTEMPTS,
+    extract_text_content,
     get_llm,
     get_llm_chain,
     get_model_name,
@@ -45,17 +46,27 @@ logger = structlog.get_logger(__name__)
 def create_rag_orchestrator(
     session: AsyncSession,
     settings: Settings,
-    llm: BaseChatModel,
+    llm: BaseChatModel | None = None,
     fallback_llms: list[BaseChatModel] | None = None,
+    fast_llm: BaseChatModel | None = None,
+    fast_fallback_llms: list[BaseChatModel] | None = None,
 ) -> RagContextOrchestrator:
-    """Cria a instância padrão de RagContextOrchestrator com retriever, rewriter e reranker."""
+    """Cria a instância padrão de RagContextOrchestrator com retriever, rewriter e reranker.
+
+    Por padrão, utiliza o modelo rápido (`get_fast_llm` / `get_fast_llm_chain`) nas etapas
+    auxiliares de reescrita e reranking, preservando `fast_llm` ou `llm` quando injetados.
+    """
     retriever = NormativeRetriever(session=session, settings=settings)
+    aux_llm = fast_llm if fast_llm is not None else llm
+    aux_fallbacks = fast_fallback_llms if fast_llm is not None else fallback_llms
     rewriter = (
-        QueryRewriter(llm=llm, fallback_llms=fallback_llms, settings=settings)
+        QueryRewriter(llm=aux_llm, fallback_llms=aux_fallbacks, settings=settings)
         if settings.query_rewriter_enabled
         else None
     )
-    reranker = NormativeReranker(llm=llm, settings=settings) if settings.reranker_enabled else None
+    reranker = (
+        NormativeReranker(llm=aux_llm, settings=settings) if settings.reranker_enabled else None
+    )
     return RagContextOrchestrator(
         retriever=retriever,
         rewriter=rewriter,
@@ -122,12 +133,18 @@ class ChatService:
     def rag_orchestrator(self) -> RagContextOrchestrator:
         """Obtém ou inicializa tardiamente o orquestrador RAG integrado."""
         if self._rag_orchestrator is None:
-            self._rag_orchestrator = create_rag_orchestrator(
-                session=self.session,
-                settings=self.settings,
-                llm=self.llm,
-                fallback_llms=self.models[1:] if len(self.models) > 1 else None,
-            )
+            if self._llm is not None:
+                self._rag_orchestrator = create_rag_orchestrator(
+                    session=self.session,
+                    settings=self.settings,
+                    llm=self._llm,
+                    fallback_llms=self._fallback_llms,
+                )
+            else:
+                self._rag_orchestrator = create_rag_orchestrator(
+                    session=self.session,
+                    settings=self.settings,
+                )
         return self._rag_orchestrator
 
     @staticmethod
@@ -285,13 +302,8 @@ class ChatService:
 
             try:
                 async for chunk in current_model.astream(prompt_messages):
-                    content = chunk.content if hasattr(chunk, "content") else str(chunk)
-                    if isinstance(content, list):
-                        token_str = "".join(
-                            str(b.get("text", b) if isinstance(b, dict) else b) for b in content
-                        )
-                    else:
-                        token_str = str(content)
+                    raw_content = chunk.content if hasattr(chunk, "content") else chunk
+                    token_str = extract_text_content(raw_content)
 
                     if token_str:
                         stream_started = True
@@ -468,16 +480,10 @@ class ChatService:
 
             try:
                 llm_response = await current_model.ainvoke(prompt_messages)
-                response_content = (
-                    llm_response.content if hasattr(llm_response, "content") else str(llm_response)
+                raw_content = (
+                    llm_response.content if hasattr(llm_response, "content") else llm_response
                 )
-                if isinstance(response_content, list):
-                    response_text = "".join(
-                        str(b.get("text", b) if isinstance(b, dict) else b)
-                        for b in response_content
-                    )
-                else:
-                    response_text = str(response_content)
+                response_text = extract_text_content(raw_content)
                 break
             except Exception as exc:
                 if attempt < max_attempts:

@@ -3,7 +3,7 @@
 ## Requirements
 
 ### Requirement: Cadeia de Fallback Automático de Modelos Gemini
-O sistema DEVE implementar uma cadeia sequencial de recuperação automática de modelos generativos Google Gemini com ordem estrita de execução: modelo primário `gemini-3.8-flash`, primeiro fallback `gemini-3.7-flash` e segundo fallback `gemini-3.6-flash`. O mecanismo deve abranger execuções síncronas (`ChatService.process_chat`), transmissões streaming (`ChatService.stream_chat`) e reescrita contextual de queries (`QueryRewriter.rewrite`).
+O sistema DEVE implementar uma cadeia sequencial de recuperação automática de modelos generativos Google Gemini com ordem estrita de execução: modelo primário `gemini-3.8-flash`, primeiro fallback `gemini-3.7-flash` e segundo fallback `gemini-3.5-flash-lite`. O mecanismo deve abranger execuções síncronas (`ChatService.process_chat`), transmissões streaming (`ChatService.stream_chat`) e reescrita contextual de queries (`QueryRewriter.rewrite`).
 
 #### Scenario: Sucesso na Tentativa 1 com Modelo Primário
 - **GIVEN** uma requisição de conversação ou reescrita e o modelo primário `gemini-3.8-flash` operacional
@@ -18,10 +18,10 @@ O sistema DEVE implementar uma cadeia sequencial de recuperação automática de
 #### Scenario: Recuperação no 2º Fallback após Falhas em 3.8 e 3.7
 - **GIVEN** que os modelos `gemini-3.8-flash` e `gemini-3.7-flash` apresentem falhas consecutivas
 - **WHEN** a cadeia sequencial avançar para a tentativa 3
-- **THEN** o sistema DEVE registrar as transições para as tentativas 1 e 2, executar o segundo fallback `gemini-3.6-flash` e retornar o resultado com sucesso.
+- **THEN** o sistema DEVE registrar as transições para as tentativas 1 e 2, executar o segundo fallback `gemini-3.5-flash-lite` e retornar o resultado com sucesso.
 
 #### Scenario: Esgotamento da Cadeia após Limite Estrito de 3 Tentativas
-- **GIVEN** que os três modelos da cadeia (`gemini-3.8-flash`, `gemini-3.7-flash` e `gemini-3.6-flash`) falhem consecutivamente
+- **GIVEN** que os três modelos da cadeia (`gemini-3.8-flash`, `gemini-3.7-flash` e `gemini-3.5-flash-lite`) falhem consecutivamente
 - **WHEN** a 3ª tentativa for frustrada
 - **THEN** o sistema DEVE interromper a execução sem exceder 3 tentativas no total e lançar `HTTPException` com código de status HTTP 503 (Service Unavailable) contendo mensagem explicativa de sobrecarga temporária.
 
