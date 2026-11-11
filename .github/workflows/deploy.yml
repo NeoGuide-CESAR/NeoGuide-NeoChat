@@ -43,11 +43,18 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_FAST_MODEL: ${{ secrets.GEMINI_FAST_MODEL }}
+          GEMINI_THINKING_LEVEL: ${{ secrets.GEMINI_THINKING_LEVEL }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
+          envs: API_KEY,GEMINI_API_KEY,GEMINI_MODEL,GEMINI_FAST_MODEL,GEMINI_THINKING_LEVEL
           script: |
             set -e
 
@@ -64,6 +71,28 @@ jobs:
             echo "=== Atualizando repositório na VPS ==="
             git fetch origin main
             git reset --hard origin/main
+
+            echo "=== Sincronizando Secrets no arquivo .env ==="
+            if [ ! -f .env ]; then
+              cp .env.example .env
+            fi
+
+            upsert_env() {
+              local key="$1"
+              local val="$2"
+              if [ -n "$val" ]; then
+                grep -v "^${key}=" .env > .env.tmp || true
+                mv .env.tmp .env
+                printf '%s=%s\n' "$key" "$val" >> .env
+              fi
+            }
+
+            upsert_env "API_KEY" "$API_KEY"
+            upsert_env "GEMINI_API_KEY" "$GEMINI_API_KEY"
+            upsert_env "GEMINI_MODEL" "$GEMINI_MODEL"
+            upsert_env "GEMINI_FAST_MODEL" "$GEMINI_FAST_MODEL"
+            upsert_env "GEMINI_THINKING_LEVEL" "$GEMINI_THINKING_LEVEL"
+            chmod 600 .env
 
             echo "=== Subindo containers NeoChat com Docker Compose ==="
             docker compose down
