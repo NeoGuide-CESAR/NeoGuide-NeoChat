@@ -16,7 +16,7 @@ SUPPORTED_EMBEDDING_PROVIDERS: tuple[str, ...] = ("gemini", "fake")
 
 DEFAULT_GEMINI_PRIMARY_MODEL: str = "gemini-3.8-flash"
 DEFAULT_GEMINI_FAST_MODEL: str = "gemini-3.5-flash-lite"
-DEFAULT_GEMINI_FALLBACK_MODELS: tuple[str, ...] = ("gemini-3.7-flash", "gemini-3.6-flash")
+DEFAULT_GEMINI_FALLBACK_MODELS: tuple[str, ...] = ("gemini-3.7-flash", "gemini-3.5-flash-lite")
 MAX_FALLBACK_ATTEMPTS: int = 3
 _THINKING_BLOCK_TYPES: tuple[str, ...] = ("thinking", "reasoning")
 

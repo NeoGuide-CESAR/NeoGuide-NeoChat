@@ -67,12 +67,12 @@ class Settings(BaseSettings):
         ),
     )
     gemini_timeout: float | None = Field(
-        default=30.0,
+        default=60.0,
         gt=0,
         description="Timeout em segundos por chamada HTTP ao provedor Gemini",
     )
     gemini_fallback_models: list[str] = Field(
-        default=["gemini-3.7-flash", "gemini-3.6-flash"],
+        default=["gemini-3.7-flash", "gemini-3.5-flash-lite"],
         description="Lista ordenada de modelos de fallback do Google Gemini",
     )
     gemini_embedding_model: str = Field(

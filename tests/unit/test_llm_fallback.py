@@ -47,7 +47,7 @@ def test_settings() -> Settings:
     return Settings(
         gemini_api_key="mock-api-key",
         gemini_model="gemini-3.8-flash",
-        gemini_fallback_models=["gemini-3.7-flash", "gemini-3.6-flash"],
+        gemini_fallback_models=["gemini-3.7-flash", "gemini-3.5-flash-lite"],
         chat_history_limit=5,
         default_llm_provider="gemini",
     )
@@ -95,13 +95,12 @@ class TestConfigAndFactoryDefaults:
         """Valida se as configurações possuem os modelos e fallbacks padrão especificados."""
         settings = Settings(_env_file=None)
         assert settings.gemini_model == "gemini-3.8-flash"
-        assert settings.gemini_fallback_models == ["gemini-3.7-flash", "gemini-3.6-flash"]
-
+        assert settings.gemini_fallback_models == ["gemini-3.7-flash", "gemini-3.5-flash-lite"]
 
     def test_factory_constants(self) -> None:
         """Valida constantes padrão na fábrica de LLMs."""
         assert DEFAULT_GEMINI_PRIMARY_MODEL == "gemini-3.8-flash"
-        assert DEFAULT_GEMINI_FALLBACK_MODELS == ("gemini-3.7-flash", "gemini-3.6-flash")
+        assert DEFAULT_GEMINI_FALLBACK_MODELS == ("gemini-3.7-flash", "gemini-3.5-flash-lite")
         assert MAX_FALLBACK_ATTEMPTS == 3
 
     def test_get_model_name_extraction(self) -> None:
@@ -115,8 +114,8 @@ class TestConfigAndFactoryDefaults:
         assert get_model_name(mock2) == "gemini-3.7-flash"
 
         mock3 = MagicMock(spec=[])
-        mock3.name = "gemini-3.6-flash"
-        assert get_model_name(mock3) == "gemini-3.6-flash"
+        mock3.name = "gemini-3.5-flash-lite"
+        assert get_model_name(mock3) == "gemini-3.5-flash-lite"
 
     def test_get_llm_chain_gemini_models(self, test_settings: Settings) -> None:
         """Valida que get_llm_chain gera a cadeia ordenada de 3 modelos Gemini."""
@@ -124,14 +123,18 @@ class TestConfigAndFactoryDefaults:
         assert len(chain) == 3
         assert chain[0].model == "gemini-3.8-flash"
         assert chain[1].model == "gemini-3.7-flash"
-        assert chain[2].model == "gemini-3.6-flash"
+        assert chain[2].model == "gemini-3.5-flash-lite"
 
     def test_get_llm_chain_respects_max_attempts_cap(self) -> None:
         """Garante que a cadeia de modelos não ultrapassa MAX_FALLBACK_ATTEMPTS (3)."""
         settings_extra = Settings(
             gemini_api_key="mock-key",
             gemini_model="gemini-3.8-flash",
-            gemini_fallback_models=["gemini-3.7-flash", "gemini-3.6-flash", "gemini-1.5-flash"],
+            gemini_fallback_models=[
+                "gemini-3.7-flash",
+                "gemini-3.5-flash-lite",
+                "gemini-1.5-flash",
+            ],
         )
         chain = get_llm_chain(provider="gemini", settings=settings_extra)
         assert len(chain) == MAX_FALLBACK_ATTEMPTS
@@ -157,7 +160,7 @@ class TestChatServiceSyncFallback:
         fb1_llm = _create_mock_chat_model("gemini-3.7-flash")
         fb1_llm.ainvoke = AsyncMock()
 
-        fb2_llm = _create_mock_chat_model("gemini-3.6-flash")
+        fb2_llm = _create_mock_chat_model("gemini-3.5-flash-lite")
         fb2_llm.ainvoke = AsyncMock()
 
         chat_service = ChatService(
@@ -199,7 +202,7 @@ class TestChatServiceSyncFallback:
             return_value=MagicMock(content="Resposta recuperada com sucesso pelo Gemini 3.7.")
         )
 
-        fb2_llm = _create_mock_chat_model("gemini-3.6-flash")
+        fb2_llm = _create_mock_chat_model("gemini-3.5-flash-lite")
         fb2_llm.ainvoke = AsyncMock()
 
         chat_service = ChatService(
@@ -245,7 +248,7 @@ class TestChatServiceSyncFallback:
         fb1_llm = _create_mock_chat_model("gemini-3.7-flash")
         fb1_llm.ainvoke = AsyncMock(side_effect=RuntimeError("429 Resource Exhausted"))
 
-        fb2_llm = _create_mock_chat_model("gemini-3.6-flash")
+        fb2_llm = _create_mock_chat_model("gemini-3.5-flash-lite")
         fb2_llm.ainvoke = AsyncMock(
             return_value=MagicMock(content="Resposta gerada pelo Gemini 3.6.")
         )
@@ -280,7 +283,7 @@ class TestChatServiceSyncFallback:
             mock_warn.assert_any_call(
                 "llm_fallback_attempt",
                 failed_model="gemini-3.7-flash",
-                next_model="gemini-3.6-flash",
+                next_model="gemini-3.5-flash-lite",
                 attempt=2,
                 error=ANY,
             )
@@ -300,7 +303,7 @@ class TestChatServiceSyncFallback:
         fb1_llm = _create_mock_chat_model("gemini-3.7-flash")
         fb1_llm.ainvoke = AsyncMock(side_effect=RuntimeError("Falha 2"))
 
-        fb2_llm = _create_mock_chat_model("gemini-3.6-flash")
+        fb2_llm = _create_mock_chat_model("gemini-3.5-flash-lite")
         fb2_llm.ainvoke = AsyncMock(side_effect=RuntimeError("Falha 3"))
 
         chat_service = ChatService(
@@ -359,7 +362,7 @@ class TestChatServiceStreamFallback:
 
         fb1_llm.astream = _success_stream
 
-        fb2_llm = _create_mock_chat_model("gemini-3.6-flash")
+        fb2_llm = _create_mock_chat_model("gemini-3.5-flash-lite")
         fb2_llm.astream = AsyncMock()
 
         chat_service = ChatService(
@@ -411,7 +414,7 @@ class TestChatServiceStreamFallback:
 
         fb1_llm.astream = _fail2
 
-        fb2_llm = _create_mock_chat_model("gemini-3.6-flash")
+        fb2_llm = _create_mock_chat_model("gemini-3.5-flash-lite")
 
         async def _fail3(*args: Any, **kwargs: Any) -> AsyncGenerator[AIMessageChunk, None]:
             raise RuntimeError("Falha 3")
@@ -453,7 +456,7 @@ class TestQueryRewriterFallback:
             return_value=MagicMock(content="Qual a especificação para ramal subterrâneo?")
         )
 
-        fb2_llm = _create_mock_chat_model("gemini-3.6-flash")
+        fb2_llm = _create_mock_chat_model("gemini-3.5-flash-lite")
         fb2_llm.ainvoke = AsyncMock()
 
         rewriter = QueryRewriter(
@@ -491,7 +494,7 @@ class TestQueryRewriterFallback:
         fb1_llm = _create_mock_chat_model("gemini-3.7-flash")
         fb1_llm.ainvoke = AsyncMock(side_effect=RuntimeError("Falha 2"))
 
-        fb2_llm = _create_mock_chat_model("gemini-3.6-flash")
+        fb2_llm = _create_mock_chat_model("gemini-3.5-flash-lite")
         fb2_llm.ainvoke = AsyncMock(side_effect=RuntimeError("Falha 3"))
 
         rewriter = QueryRewriter(
