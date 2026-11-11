@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from lumi.core.config import Settings
 from lumi.rag.reranker import NormativeReranker
@@ -216,3 +217,76 @@ class TestNormativeRerankerExecution:
         # Restantes preenchidos na ordem original
         assert result[2] == candidate_chunks[0]
         assert result[3] == candidate_chunks[2]
+
+    @pytest.mark.asyncio
+    async def test_rerank_parses_gemini3_block_list_without_thinking(
+        self,
+        mock_llm: MagicMock,
+        candidate_chunks: list[RetrievedChunk],
+    ) -> None:
+        """Extrai JSON corretamente quando response.content é lista de blocos Gemini 3+."""
+        mock_response = MagicMock()
+        mock_response.content = [
+            {
+                "type": "text",
+                "text": "[2, 0, 4]",
+                "extras": {"signature": "gemini-sig-xyz"},
+            }
+        ]
+        mock_llm.ainvoke.return_value = mock_response
+
+        settings = Settings(reranker_enabled=True, reranker_top_n=3)
+        reranker = NormativeReranker(llm=mock_llm, settings=settings)
+
+        result = await reranker.rerank(
+            query="Edifícios coletivos?", chunks=candidate_chunks, top_n=3
+        )
+
+        assert [result[0], result[1], result[2]] == [
+            candidate_chunks[2],
+            candidate_chunks[0],
+            candidate_chunks[4],
+        ]
+
+    @pytest.mark.asyncio
+    async def test_rerank_ignores_thinking_block_in_gemini3_response(
+        self,
+        mock_llm: MagicMock,
+        candidate_chunks: list[RetrievedChunk],
+    ) -> None:
+        """Ignora blocos thinking contendo colchetes e extrai apenas o bloco text."""
+        mock_response = MagicMock()
+        mock_response.content = [
+            {
+                "type": "thinking",
+                "thinking": "Comparando candidatos [5, 4, 3]... mas o melhor é 1 e 3.",
+            },
+            {
+                "type": "text",
+                "text": "[1, 3, 0]",
+                "extras": {"signature": "gemini-sig-123"},
+            },
+        ]
+        mock_llm.ainvoke.return_value = mock_response
+
+        settings = Settings(reranker_enabled=True, reranker_top_n=3)
+        reranker = NormativeReranker(llm=mock_llm, settings=settings)
+
+        result = await reranker.rerank(query="Ramal aéreo?", chunks=candidate_chunks, top_n=3)
+
+        assert [result[0], result[1], result[2]] == [
+            candidate_chunks[1],
+            candidate_chunks[3],
+            candidate_chunks[0],
+        ]
+
+    def test_reranker_uses_fast_llm_by_default(self) -> None:
+        """Sem LLM injetada, NormativeReranker instancia o modelo rápido (gemini-3.5-flash-lite)."""
+        settings = Settings(
+            _env_file=None,
+            default_llm_provider="gemini",
+            gemini_api_key="mock-gemini-key",
+        )
+        reranker = NormativeReranker(settings=settings)
+        assert isinstance(reranker.llm, ChatGoogleGenerativeAI)
+        assert reranker.llm.model == "gemini-3.5-flash-lite"

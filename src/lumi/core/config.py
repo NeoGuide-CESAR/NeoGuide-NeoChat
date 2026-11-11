@@ -1,6 +1,7 @@
 """Configurações centrais do sistema utilizando Pydantic Settings."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,6 +46,18 @@ class Settings(BaseSettings):
     )
     gemini_api_key: str = Field(default="", description="Chave de API do Google Gemini")
     gemini_model: str = Field(default="gemini-3.8-flash", description="Modelo LLM padrão")
+    gemini_fast_model: str = Field(
+        default="gemini-3.5-flash-lite",
+        description="Modelo rápido para etapas auxiliares (reranker e reescrita de query)",
+    )
+    gemini_thinking_level: Literal["minimal", "low", "medium", "high"] | None = Field(
+        default="low",
+        description="Nível de raciocínio (thinking_level) para modelos Gemini 3+",
+    )
+    gemini_fast_thinking_level: Literal["minimal", "low", "medium", "high"] | None = Field(
+        default=None,
+        description="Nível de raciocínio opcional para o modelo rápido (Gemini 3+)",
+    )
     gemini_fallback_models: list[str] = Field(
         default=["gemini-3.7-flash", "gemini-3.6-flash"],
         description="Lista ordenada de modelos de fallback do Google Gemini",

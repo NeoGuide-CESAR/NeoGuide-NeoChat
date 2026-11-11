@@ -10,7 +10,8 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from lumi.core.config import Settings, get_settings
 from lumi.rag.llm_factory import (
     MAX_FALLBACK_ATTEMPTS,
-    get_llm_chain,
+    extract_text_content,
+    get_fast_llm_chain,
     get_model_name,
 )
 
@@ -55,7 +56,7 @@ class QueryRewriter:
                     chain.extend(self._fallback_llms)
                 self._models = chain
             else:
-                self._models = get_llm_chain(settings=self.settings)
+                self._models = get_fast_llm_chain(settings=self.settings)
         return self._models
 
     @property
@@ -124,7 +125,7 @@ class QueryRewriter:
 
             try:
                 response = await current_model.ainvoke(messages)
-                content = str(response.content).strip()
+                content = extract_text_content(response.content).strip()
                 # Limpa aspas ou delimitadores que a LLM possa gerar
                 cleaned_query = content.strip("\"'").strip()
 

@@ -10,7 +10,7 @@ import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from lumi.core.config import Settings, get_settings
-from lumi.rag.llm_factory import get_llm
+from lumi.rag.llm_factory import extract_text_content, get_fast_llm
 from lumi.rag.retriever import RetrievedChunk
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ class NormativeReranker:
     ) -> None:
         """Inicializa o reranker com LLM e configurações do sistema."""
         self.settings = settings or get_settings()
-        self.llm = llm or get_llm(settings=self.settings)
+        self.llm = llm or get_fast_llm(settings=self.settings)
 
     async def rerank(
         self,
@@ -107,7 +107,7 @@ class NormativeReranker:
 
         try:
             response = await self.llm.ainvoke(messages)
-            raw_content = str(response.content).strip()
+            raw_content = extract_text_content(response.content).strip()
 
             # Extração defensiva de bloco JSON
             json_match = re.search(r"\[[\s\S]*?\]", raw_content)

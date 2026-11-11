@@ -69,7 +69,7 @@ graph TD
 | **Logging Estruturado** | **structlog (JSON)** | Logs estruturados em formato JSON para correlacao de requests, debug do pipeline RAG e complemento a tabela normative_query_analytics. |
 | **Orquestracao de RAG** | **LangChain** | Padrao da industria para cadeias de RAG, gerenciamento flexivel de historico de chat e troca agnostica de provedores de LLM. |
 | **Banco Vetorial & Relacional** | **PostgreSQL + pgvector** | Solucao unificada e gratuita: gerencia entidades relacionais (sessoes, mensagens, analytics) e vetores densos com indices HNSW sem custo de bancos dedicados. |
-| **Modelos de Linguagem (LLMs)**| **Google Gemini (primario) / Anthropic Claude (alternativo)** | Google Gemini como provedor primario por custo reduzido e grande janela de contexto. Anthropic Claude disponivel como alternativa manual via troca de variavel de ambiente, sem fallback automatico entre provedores. |
+| **Modelos de Linguagem (LLMs)**| **Google Gemini (primario) / Anthropic Claude (alternativo)** | Google Gemini como provedor primario com arquitetura dual de modelos: `gemini-3.8-flash` (`thinking_level="low"`) para geracao final no `ChatService` e modelo rapido `gemini-3.5-flash-lite` (sem raciocinio por padrao) para etapas auxiliares de reescrita (`QueryRewriter`) e reranking (`NormativeReranker`), com extracao unificada de blocos Gemini 3+ (`extract_text_content`). Anthropic Claude disponivel como alternativa via variavel de ambiente. |
 | **Middleware CORS** | **Permissivo (`*`)** | Todas as origens sao aceitas no MVP academico. O frontend do Wizard NeoGuide consome a API diretamente do browser; restricao de dominios sera aplicada em producao. |
 
 ---
@@ -177,3 +177,9 @@ data: {"error": "Desculpe, ocorreu uma falha temporaria na geracao da resposta. 
   1. `lumi-db`: Imagem oficial `pgvector/pgvector:pg16` com persistencia de volume local;
   2. `lumi-api`: Container Python otimizado rodando FastAPI com hot-reload de desenvolvimento.
 - **Consequencias:** Setup reproduzivel em um unico comando (`docker compose up --build`); zero necessidade de instalar Python, PostgreSQL ou dependencias na maquina do desenvolvedor; paridade total de ambiente entre todos os membros do grupo.
+
+### ADR-06: Arquitetura Dual de Modelos Gemini e Extracao Defensiva de Blocos (Gemini 3+)
+- **Status:** Aprovado.
+- **Contexto:** Modelos Gemini 3+ suportam raciocinio configuravel (`thinking_level`) e retornam `response.content` como lista estruturada de blocos (`thinking`, `reasoning`, `text` com `extras.signature`), o que causava latencia elevada nas etapas auxiliares do RAG e `JSONDecodeError` no `NormativeReranker`.
+- **Decisao:** Separar o perfil de modelo principal (`GEMINI_MODEL=gemini-3.8-flash` com `GEMINI_THINKING_LEVEL=low`) apenas para a geracao final no `ChatService`, utilizando o modelo leve `GEMINI_FAST_MODEL=gemini-3.5-flash-lite` (via `get_fast_llm` / `get_fast_llm_chain`, com `GEMINI_FAST_THINKING_LEVEL=None` por padrao) no `QueryRewriter` e no `NormativeReranker`. Centralizar o parsing de blocos via `extract_text_content`.
+- **Consequencias:** Reducao significativa de latencia de ponta a ponta no pipeline RAG e eliminacao de vazamento de blocos `thinking` ou falhas de JSON no reranking, mantendo compatibilidade retroativa com modelos legados (ex.: `gemini-1.5-pro`).

@@ -72,3 +72,11 @@ As configurações de sistema em `src/lumi/core/config.py` DEVEM incluir `rerank
 #### Scenario: Valores padrão atualizados em Settings
 - **WHEN** uma instância de `Settings` for carregada sem variáveis de ambiente específicas
 - **THEN** `settings.reranker_enabled` deve ser `True`, `settings.reranker_top_n` deve ser `5` e `settings.query_rewriter_enabled` deve ser `True`.
+
+### Requirement: Uso de Modelo Rápido e Parsing de Blocos Gemini 3+ no Reranker e Reescritor
+`NormativeReranker` e `QueryRewriter` DEVEM utilizar `get_fast_llm` / `get_fast_llm_chain` por padrão quando nenhuma instância de LLM for injetada, e DEVEM processar `response.content` via `extract_text_content` para suportar respostas em lista de blocos Gemini 3+ (incluindo blocos `thinking` e `extras`).
+
+#### Scenario: Reranking e reescrita com blocos estruturados Gemini 3+
+- **GIVEN** uma resposta da LLM contendo lista de blocos com bloco `thinking` e bloco `text`
+- **WHEN** `NormativeReranker.rerank()` ou `QueryRewriter.rewrite()` processar a resposta
+- **THEN** apenas o conteúdo textual útil deve ser extraído, evitando `JSONDecodeError` e mantendo a ordenação/reescrita corretas.
