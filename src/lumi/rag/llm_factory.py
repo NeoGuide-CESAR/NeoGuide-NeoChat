@@ -108,6 +108,11 @@ def _build_llm(
             if configured_thinking is not None:
                 kwargs["thinking_level"] = configured_thinking
 
+        # Falha rápida no SDK para que erros 503/timeout acionem imediatamente a cadeia de fallback
+        kwargs.setdefault("max_retries", resolved_settings.gemini_max_retries)
+        if resolved_settings.gemini_timeout is not None:
+            kwargs.setdefault("timeout", resolved_settings.gemini_timeout)
+
         return ChatGoogleGenerativeAI(
             model=model_name,
             google_api_key=api_key,

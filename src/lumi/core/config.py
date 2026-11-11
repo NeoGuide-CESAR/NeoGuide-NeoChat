@@ -58,6 +58,19 @@ class Settings(BaseSettings):
         default=None,
         description="Nível de raciocínio opcional para o modelo rápido (Gemini 3+)",
     )
+    gemini_max_retries: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Número máximo de tentativas internas do SDK Gemini por modelo antes de acionar "
+            "a cadeia de fallback (1 evita loops longos de retry em erros 503)"
+        ),
+    )
+    gemini_timeout: float | None = Field(
+        default=30.0,
+        gt=0,
+        description="Timeout em segundos por chamada HTTP ao provedor Gemini",
+    )
     gemini_fallback_models: list[str] = Field(
         default=["gemini-3.7-flash", "gemini-3.6-flash"],
         description="Lista ordenada de modelos de fallback do Google Gemini",

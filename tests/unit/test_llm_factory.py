@@ -154,11 +154,27 @@ def test_validate_embedding_dimension(mock_settings: Settings) -> None:
 
 
 def test_settings_fast_model_and_thinking_defaults() -> None:
-    """Valida defaults de modelo rápido e thinking_level em Settings."""
+    """Valida defaults de modelo rápido, thinking_level, max_retries e timeout em Settings."""
     settings = Settings(_env_file=None)
     assert settings.gemini_fast_model == "gemini-3.5-flash-lite"
     assert settings.gemini_thinking_level == "low"
     assert settings.gemini_fast_thinking_level is None
+    assert settings.gemini_max_retries == 1
+    assert settings.gemini_timeout == 30.0
+
+
+def test_get_llm_applies_fail_fast_retry_and_timeout_for_fallback() -> None:
+    """Garante max_retries=1 e timeout=30.0 no Gemini para acionar fallback rapidamente em 503."""
+    settings = Settings(_env_file=None, gemini_api_key="mock-gemini-api-key")
+    llm = get_llm(provider="gemini", settings=settings)
+    assert isinstance(llm, ChatGoogleGenerativeAI)
+    assert llm.max_retries == 1
+    assert llm.timeout == 30.0
+
+    # Override explícito via kwargs deve prevalecer
+    llm_custom = get_llm(provider="gemini", settings=settings, max_retries=3, timeout=60.0)
+    assert llm_custom.max_retries == 3
+    assert llm_custom.timeout == 60.0
 
 
 def test_get_llm_applies_thinking_level_only_on_gemini_3_plus() -> None:
