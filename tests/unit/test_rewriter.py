@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from lumi.core.config import Settings
 from lumi.rag.rewriter import QueryRewriter
@@ -162,3 +163,37 @@ class TestQueryRewriterExecution:
         result = await rewriter.rewrite(query=query, chat_history=sample_chat_history)
 
         assert result == query
+
+    @pytest.mark.asyncio
+    async def test_rewrite_parses_gemini3_block_list_ignoring_thinking(
+        self,
+        mock_llm: MagicMock,
+        sample_chat_history: list,
+    ) -> None:
+        """Extrai texto útil de resposta em blocos Gemini 3+ ignorando blocos thinking."""
+        mock_response = MagicMock()
+        mock_response.content = [
+            {"type": "thinking", "thinking": "Desambiguando pergunta sobre ramal aéreo..."},
+            {
+                "type": "text",
+                "text": '"Qual o dimensionamento de ramal aéreo na DIS-NOR-030?"',
+                "extras": {"signature": "sig-rewriter"},
+            },
+        ]
+        mock_llm.ainvoke.return_value = mock_response
+
+        rewriter = QueryRewriter(llm=mock_llm)
+        result = await rewriter.rewrite(query="E se for aéreo?", chat_history=sample_chat_history)
+
+        assert result == "Qual o dimensionamento de ramal aéreo na DIS-NOR-030?"
+
+    def test_rewriter_uses_fast_llm_chain_by_default(self) -> None:
+        """Sem LLM injetada, QueryRewriter resolve cadeia iniciando em gemini-3.5-flash-lite."""
+        settings = Settings(
+            _env_file=None,
+            default_llm_provider="gemini",
+            gemini_api_key="mock-gemini-key",
+        )
+        rewriter = QueryRewriter(settings=settings)
+        assert isinstance(rewriter.llm, ChatGoogleGenerativeAI)
+        assert rewriter.llm.model == "gemini-3.5-flash-lite"

@@ -20,7 +20,7 @@ from lumi.schemas.chat import (
     ChatRequest,
     ChatResponse,
 )
-from lumi.services.chat_service import ChatService
+from lumi.services.chat_service import ChatService, create_rag_orchestrator
 from lumi.services.session_service import (
     SessionExpiredError,
     SessionNotFoundError,
@@ -521,3 +521,148 @@ class TestChatServiceSync:
         assert response.session_id == session_id
         assert CONTINGENCY_NO_SOURCES_MESSAGE in response.response
         assert response.sources == []
+
+    @pytest.mark.asyncio
+    async def test_process_chat_filters_thinking_blocks_from_gemini3_response(
+        self,
+        mock_db_session: AsyncMock,
+        mock_session_service: AsyncMock,
+        mock_rag_orchestrator: AsyncMock,
+        test_settings: Settings,
+    ) -> None:
+        """process_chat deve ignorar blocos thinking/reasoning e retornar apenas o texto final."""
+        gemini3_llm = MagicMock()
+        gemini3_llm.ainvoke = AsyncMock(
+            return_value=MagicMock(
+                content=[
+                    {"type": "thinking", "thinking": "Analisando norma DIS-NOR-030..."},
+                    {"type": "reasoning", "text": "Etapa interna"},
+                    {
+                        "type": "text",
+                        "text": "O limite de queda de tensão é 5%.",
+                        "extras": {"signature": "sig-chat-sync"},
+                    },
+                ]
+            )
+        )
+
+        chat_service = ChatService(
+            session=mock_db_session,
+            llm=gemini3_llm,
+            rag_orchestrator=mock_rag_orchestrator,
+            session_service=mock_session_service,
+            settings=test_settings,
+        )
+
+        req = ChatRequest(
+            session_id=uuid4(), message="Qual o limite de queda de tensão?", stream=False
+        )
+        response = await chat_service.process_chat(req)
+
+        assert response.response == "O limite de queda de tensão é 5%."
+        assert "thinking" not in response.response
+        assert "Etapa interna" not in response.response
+
+    @pytest.mark.asyncio
+    async def test_stream_chat_filters_thinking_blocks_from_gemini3_chunks(
+        self,
+        mock_db_session: AsyncMock,
+        mock_session_service: AsyncMock,
+        mock_rag_orchestrator: AsyncMock,
+        test_settings: Settings,
+    ) -> None:
+        """stream_chat deve filtrar blocos thinking/reasoning sem emitir tokens vazios nem vazar dicts."""
+        gemini3_llm = MagicMock()
+
+        async def _gemini3_astream(
+            *args: Any, **kwargs: Any
+        ) -> AsyncGenerator[AIMessageChunk, None]:
+            yield AIMessageChunk(content=[{"type": "thinking", "thinking": "Raciocínio inicial"}])
+            yield AIMessageChunk(content=[{"type": "reasoning", "text": "Interno"}])
+            yield AIMessageChunk(
+                content=[{"type": "text", "text": "Limite de 5% ", "extras": {"signature": "s1"}}]
+            )
+            yield AIMessageChunk(content=[{"type": "text", "text": "na DIS-NOR-030."}])
+
+        gemini3_llm.astream = _gemini3_astream
+
+        chat_service = ChatService(
+            session=mock_db_session,
+            llm=gemini3_llm,
+            rag_orchestrator=mock_rag_orchestrator,
+            session_service=mock_session_service,
+            settings=test_settings,
+        )
+
+        req = ChatRequest(session_id=uuid4(), message="Qual o limite?", stream=True)
+        events_raw = [event async for event in chat_service.stream_chat(req)]
+        parsed_events = _parse_sse_chunks(events_raw)
+
+        token_events = [e[1]["token"] for e in parsed_events if e[0] == "token"]
+        assert token_events == ["Limite de 5% ", "na DIS-NOR-030."]
+        full_text = "".join(token_events)
+        assert "Raciocínio" not in full_text
+        assert "Interno" not in full_text
+
+    def test_chat_service_uses_fast_model_in_rag_and_main_model_in_generation(
+        self,
+        mock_db_session: AsyncMock,
+        mock_session_service: AsyncMock,
+    ) -> None:
+        """ChatService usa gemini-3.8-flash (thinking low) na geração e gemini-3.5-flash-lite no RAG."""
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        settings = Settings(
+            _env_file=None,
+            default_llm_provider="gemini",
+            gemini_api_key="mock-gemini-key",
+            reranker_enabled=True,
+            query_rewriter_enabled=True,
+        )
+        chat_service = ChatService(
+            session=mock_db_session,
+            session_service=mock_session_service,
+            settings=settings,
+        )
+
+        # LLM principal de geração
+        assert isinstance(chat_service.llm, ChatGoogleGenerativeAI)
+        assert chat_service.llm.model == "gemini-3.8-flash"
+        assert chat_service.llm.reasoning_effort == "low"
+
+        # Orquestrador RAG com modelos rápidos
+        orchestrator = chat_service.rag_orchestrator
+        assert orchestrator.reranker is not None
+        assert isinstance(orchestrator.reranker.llm, ChatGoogleGenerativeAI)
+        assert orchestrator.reranker.llm.model == "gemini-3.5-flash-lite"
+        assert orchestrator.reranker.llm.reasoning_effort is None
+
+        assert orchestrator.rewriter is not None
+        assert isinstance(orchestrator.rewriter.llm, ChatGoogleGenerativeAI)
+        assert orchestrator.rewriter.llm.model == "gemini-3.5-flash-lite"
+
+    def test_create_rag_orchestrator_prefers_fast_llm_over_main_llm(
+        self,
+        mock_db_session: AsyncMock,
+    ) -> None:
+        """create_rag_orchestrator utiliza fast_llm quando fornecido em paralelo ao llm principal."""
+        main_llm = MagicMock()
+        fast_llm = MagicMock()
+        settings = Settings(
+            _env_file=None,
+            gemini_api_key="mock-gemini-key",
+            reranker_enabled=True,
+            query_rewriter_enabled=True,
+        )
+
+        orchestrator = create_rag_orchestrator(
+            session=mock_db_session,
+            settings=settings,
+            llm=main_llm,
+            fast_llm=fast_llm,
+        )
+
+        assert orchestrator.reranker is not None
+        assert orchestrator.reranker.llm is fast_llm
+        assert orchestrator.rewriter is not None
+        assert orchestrator.rewriter.llm is fast_llm

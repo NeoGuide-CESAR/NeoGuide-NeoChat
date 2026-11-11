@@ -61,3 +61,23 @@ Ao instanciar o gerador de embeddings Google Gemini (`GoogleGenerativeAIEmbeddin
 - **WHEN** os argumentos forem repassados para `GoogleGenerativeAIEmbeddings`
 - **THEN** o parâmetro `output_dimensionality` deve ser injetado com o valor de `settings.embedding_dimension` caso não tenha sido explicitamente customizado.
 
+---
+
+### Requirement: Instanciação de Modelo Rápido e Thinking Level Condicional (Gemini 3+)
+O módulo `lumi.rag.llm_factory` DEVE fornecer `get_fast_llm(...)` e `get_fast_llm_chain(...)` utilizando `Settings.gemini_fast_model` (`gemini-3.5-flash-lite`) e `Settings.gemini_fast_thinking_level` (`None` por padrão) para etapas auxiliares do RAG, aplicando `thinking_level` apenas a modelos da família `gemini-3*` quando não sobrescrito via `kwargs`.
+
+#### Scenario: Modelo rápido sem thinking por padrão e thinking_level apenas em Gemini 3+
+- **GIVEN** `Settings` padrão (`gemini_model="gemini-3.8-flash"`, `gemini_thinking_level="low"`, `gemini_fast_model="gemini-3.5-flash-lite"`, `gemini_fast_thinking_level=None`, `gemini_max_retries=1`, `gemini_timeout=60.0`)
+- **WHEN** `get_llm` e `get_fast_llm` forem chamados para Gemini
+- **THEN** `get_llm` deve configurar `thinking_level="low"` apenas para `gemini-3*` (não aplicando a `gemini-1.5-pro`), `get_fast_llm` deve instanciar `gemini-3.5-flash-lite` sem `thinking_level` por padrão, e ambos devem aplicar `max_retries=1` e `timeout=60.0` (quando não sobrescritos) para fail-fast na cadeia de fallback em erros `503`.
+
+---
+
+### Requirement: Extração Unificada de Blocos Gemini 3+ (`extract_text_content`)
+O módulo `lumi.rag.llm_factory` DEVE fornecer `extract_text_content(content: Any) -> str` ignorando blocos `thinking` e `reasoning` e extraindo apenas o texto útil de strings simples ou listas de blocos estruturados.
+
+#### Scenario: Filtragem de blocos thinking e extração de bloco text com extras
+- **GIVEN** uma resposta `content` no formato `[{"type": "thinking", ...}, {"type": "text", "text": "[2, 0]", "extras": {"signature": "..."}}]`
+- **WHEN** `extract_text_content(content)` for executada
+- **THEN** deve retornar exclusivamente `"[2, 0]"` sem incluir conteúdo de raciocínio nem serialização de dicionários.
+
